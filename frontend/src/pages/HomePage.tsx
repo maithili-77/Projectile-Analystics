@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   PlayCircle,
-  FlaskConical,
+  Calculator,
   TrendingUp,
   Zap,
   ShieldCheck,
@@ -54,11 +54,11 @@ export const HomePage: React.FC<Props> = ({ setActivePage }) => {
               <span>Launch Simulator</span>
             </button>
             <button
-              onClick={() => setActivePage('prediction_lab')}
+              onClick={() => setActivePage('calculator')}
               className="px-6 py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center gap-2 transition-all"
             >
-              <FlaskConical className="w-4 h-4 text-cyan-400" />
-              <span>Prediction Lab</span>
+              <Calculator className="w-4 h-4 text-cyan-400" />
+              <span>Launch Calculator</span>
             </button>
           </div>
         </div>

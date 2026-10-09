@@ -4,10 +4,6 @@ import { Footer } from './components/Footer';
 import { HomePage } from './pages/HomePage';
 import { CalculatorPage } from './pages/CalculatorPage';
 import { SimulatorPage } from './pages/SimulatorPage';
-import { PredictionLabPage } from './pages/PredictionLabPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
-import { ModelsPage } from './pages/ModelsPage';
-import { DatasetsPage } from './pages/DatasetsPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { AboutPage } from './pages/AboutPage';
@@ -48,10 +44,6 @@ export const App: React.FC = () => {
           {activePage === 'home' && <HomePage setActivePage={setActivePage} health={health} />}
           {activePage === 'calculator' && <CalculatorPage setActivePage={setActivePage} />}
           {activePage === 'simulator' && <SimulatorPage />}
-          {activePage === 'prediction_lab' && <PredictionLabPage />}
-          {activePage === 'analytics' && <AnalyticsPage />}
-          {activePage === 'models' && <ModelsPage />}
-          {activePage === 'datasets' && <DatasetsPage />}
           {activePage === 'history' && <HistoryPage />}
           {activePage === 'reports' && <ReportsPage />}
           {activePage === 'about' && <AboutPage />}

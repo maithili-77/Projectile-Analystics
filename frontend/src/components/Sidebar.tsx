@@ -22,10 +22,6 @@ export type PageId =
   | 'home'
   | 'calculator'
   | 'simulator'
-  | 'prediction_lab'
-  | 'analytics'
-  | 'models'
-  | 'datasets'
   | 'history'
   | 'reports'
   | 'about';
@@ -55,10 +51,6 @@ export const Sidebar: React.FC<Props> = ({
     { id: 'home', label: 'Home', icon: Home },
     { id: 'calculator', label: 'Calculator', icon: Calculator },
     { id: 'simulator', label: 'Simulator', icon: PlayCircle },
-    { id: 'prediction_lab', label: 'Prediction Lab', icon: FlaskConical },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'models', label: 'Model Insights', icon: Cpu },
-    { id: 'datasets', label: 'Dataset Explorer', icon: Database },
     { id: 'history', label: 'Prediction History', icon: History },
     { id: 'reports', label: 'Research Reports', icon: FileText },
     { id: 'about', label: 'About', icon: Info },
