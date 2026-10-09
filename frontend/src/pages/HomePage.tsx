@@ -1,39 +1,25 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
-  Compass,
   PlayCircle,
   FlaskConical,
-  Database,
-  Cpu,
-  CheckCircle2,
   TrendingUp,
   Zap,
   ShieldCheck,
-  ArrowRight,
   Activity,
-  Layers
+  GraduationCap,
+  BookOpen,
+  Info
 } from 'lucide-react';
 import { AcademicDisclaimer } from '../components/AcademicDisclaimer';
 import { PageId } from '../components/Sidebar';
-import { api } from '../services/api';
-import { HealthStatus, DatasetMetadataItem, ModelMetadataItem } from '../types';
+import { HealthStatus } from '../types';
 
 interface Props {
   setActivePage: (page: PageId) => void;
   health: HealthStatus | null;
 }
 
-export const HomePage: React.FC<Props> = ({ setActivePage, health }) => {
-  const [datasets, setDatasets] = useState<DatasetMetadataItem[]>([]);
-  const [models, setModels] = useState<Record<string, ModelMetadataItem>>({});
-
-  useEffect(() => {
-    api.getDatasets().then(res => setDatasets(res)).catch(() => {});
-    api.getModels().then(res => setModels(res)).catch(() => {});
-  }, []);
-
-  const totalRecords = datasets.reduce((sum, d) => sum + d.rows, 0) || 11584;
-  const loadedCount = health?.models_loaded || '9/9';
+export const HomePage: React.FC<Props> = ({ setActivePage }) => {
 
   return (
     <div className="space-y-8">
@@ -78,190 +64,153 @@ export const HomePage: React.FC<Props> = ({ setActivePage, health }) => {
         </div>
       </div>
 
-      {/* Dashboard Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="glass-card p-5 rounded-xl border border-slate-800">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-mono mb-2">
-            <span>ML Domains</span>
-            <Cpu className="w-4 h-4 text-cyan-400" />
-          </div>
-          <div className="text-2xl font-extrabold text-slate-100 font-mono">3 Models</div>
-          <div className="text-[11px] text-slate-400 mt-1 font-mono">Trajectory, Performance, V50</div>
-        </div>
 
-        <div className="glass-card p-5 rounded-xl border border-slate-800">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-mono mb-2">
-            <span>Datasets</span>
-            <Database className="w-4 h-4 text-indigo-400" />
-          </div>
-          <div className="text-2xl font-extrabold text-slate-100 font-mono">3 Datasets</div>
-          <div className="text-[11px] text-slate-400 mt-1 font-mono">Benchmark Research Data</div>
-        </div>
 
-        <div className="glass-card p-5 rounded-xl border border-slate-800">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-mono mb-2">
-            <span>Backend Status</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="text-2xl font-extrabold text-emerald-300 font-mono">{loadedCount} Ready</div>
-          <div className="text-[11px] text-slate-400 mt-1 font-mono">Model Registry Active</div>
-        </div>
-
-        <div className="glass-card p-5 rounded-xl border border-slate-800">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-mono mb-2">
-            <span>Total Records</span>
-            <Layers className="w-4 h-4 text-purple-400" />
-          </div>
-          <div className="text-2xl font-extrabold text-slate-100 font-mono">
-            {totalRecords.toLocaleString()}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1 font-mono">Training Samples</div>
-        </div>
-      </div>
-
-      {/* Model Cards Section */}
-      <div className="space-y-4">
-        <h2 className="text-base font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-          <span>Trained Model Registry Architectures</span>
+      {/* Informational Research Sections */}
+      <div className="space-y-6">
+        <h2 className="text-base font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-mono">
+          <BookOpen className="w-4 h-4 text-cyan-400" />
+          <span>Predictive Analytics & Research Modules</span>
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card 1: Trajectory */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Section 1: Predicting Projectile Range and Maximum Height */}
           <div className="glass-card p-6 rounded-2xl border border-slate-800 hover:border-cyan-500/40 transition-all flex flex-col justify-between">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center shrink-0">
                   <TrendingUp className="w-5 h-5" />
                 </div>
-                <span className="px-2.5 py-1 text-[10px] font-mono rounded bg-slate-900 text-slate-400 border border-slate-800">
-                  accurate_ballastic.csv
-                </span>
+                <h3 className="text-base font-bold text-slate-100 leading-snug">
+                  Predicting Projectile Range and Maximum Height
+                </h3>
               </div>
 
-              <div>
-                <h3 className="text-base font-bold text-slate-100">TRAJECTORY ANALYTICS</h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Predicts projectile downrange distance and maximum apex altitude based on launch conditions.
-                </p>
-              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                This module predicts the actual range and maximum height using input parameters such as initial velocity, launch angle, and gravity. Machine learning models analyze the relationship between these parameters and recorded outcomes to estimate both target values.
+              </p>
 
-              <div className="grid grid-cols-2 gap-3 text-xs font-mono pt-2 border-t border-slate-800/80">
-                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                  <span className="text-slate-500 block text-[10px]">RECORDS</span>
-                  <span className="text-cyan-300 font-bold">10,000 records</span>
-                </div>
-                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                  <span className="text-slate-500 block text-[10px]">TARGETS</span>
-                  <span className="text-cyan-300 font-bold">2 targets</span>
-                </div>
-              </div>
-
-              <div className="text-[11px] font-mono text-slate-400 space-y-1">
-                <div>Inputs: <span className="text-slate-200">velocity, angle_deg, gravity</span></div>
-                <div>Targets: <span className="text-slate-200">range_actual, max_height_actual</span></div>
+              <div className="pt-3 border-t border-slate-800/80 space-y-2">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-cyan-400 font-mono flex items-center gap-1.5">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>How it helps students and researchers:</span>
+                </h4>
+                <ul className="space-y-2 text-xs text-slate-300">
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0 mt-1.5" />
+                    <span>Understand how input variables influence predicted range and maximum height.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0 mt-1.5" />
+                    <span>Compare machine learning predictions with recorded values and reference calculations.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0 mt-1.5" />
+                    <span>Explore regression techniques, model performance, and prediction errors.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0 mt-1.5" />
+                    <span>Support academic experiments involving mathematical modelling and trajectory analysis.</span>
+                  </li>
+                </ul>
               </div>
             </div>
-
-            <button
-              onClick={() => setActivePage('prediction_lab')}
-              className="mt-6 w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-300 text-xs font-mono border border-slate-800 flex items-center justify-center gap-2 transition-colors"
-            >
-              <span>Test Trajectory Models</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
           </div>
 
-          {/* Card 2: Ballistic Performance */}
+          {/* Section 2: Predicting Velocity, Energy, and Ballistic Drop */}
           <div className="glass-card p-6 rounded-2xl border border-slate-800 hover:border-emerald-500/40 transition-all flex flex-col justify-between">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
                   <Zap className="w-5 h-5" />
                 </div>
-                <span className="px-2.5 py-1 text-[10px] font-mono rounded bg-slate-900 text-slate-400 border border-slate-800">
-                  ballistics_500.csv
-                </span>
+                <h3 className="text-base font-bold text-slate-100 leading-snug">
+                  Predicting Velocity, Energy, and Ballistic Drop
+                </h3>
               </div>
 
-              <div>
-                <h3 className="text-base font-bold text-slate-100">BALLISTIC PERFORMANCE</h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Evaluates velocity decay, kinetic energy drop, and bullet drop over distance.
-                </p>
-              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                This module predicts velocity at 100 and 200 units of distance, energy at 100 and 200 units, and ballistic drop at 100 and 200 units using available projectile characteristics and recorded measurements.
+              </p>
 
-              <div className="grid grid-cols-2 gap-3 text-xs font-mono pt-2 border-t border-slate-800/80">
-                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                  <span className="text-slate-500 block text-[10px]">RECORDS</span>
-                  <span className="text-emerald-300 font-bold">500 records</span>
-                </div>
-                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                  <span className="text-slate-500 block text-[10px]">TARGETS</span>
-                  <span className="text-emerald-300 font-bold">6 targets</span>
-                </div>
-              </div>
-
-              <div className="text-[11px] font-mono text-slate-400 space-y-1">
-                <div>Inputs: <span className="text-slate-200">Cartridge, Type, Weight, BC, V0</span></div>
-                <div>Targets: <span className="text-slate-200">V100, V200, E100, E200, BD100, BD200</span></div>
+              <div className="pt-3 border-t border-slate-800/80 space-y-2">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400 font-mono flex items-center gap-1.5">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>How it helps students and researchers:</span>
+                </h4>
+                <ul className="space-y-2 text-xs text-slate-300">
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 mt-1.5" />
+                    <span>Study relationships between projectile characteristics and measured performance values.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 mt-1.5" />
+                    <span>Compare predictions across multiple regression models.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 mt-1.5" />
+                    <span>Investigate how missing data, feature selection, and preprocessing affect model accuracy.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 mt-1.5" />
+                    <span>Learn how machine learning can estimate multiple continuous target values from structured data.</span>
+                  </li>
+                </ul>
               </div>
             </div>
-
-            <button
-              onClick={() => setActivePage('prediction_lab')}
-              className="mt-6 w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-300 text-xs font-mono border border-slate-800 flex items-center justify-center gap-2 transition-colors"
-            >
-              <span>Test Ballistic Performance</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
           </div>
 
-          {/* Card 3: V50 Material */}
+          {/* Section 3: Predicting V50 Ballistic Limit */}
           <div className="glass-card p-6 rounded-2xl border border-slate-800 hover:border-purple-500/40 transition-all flex flex-col justify-between">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 flex items-center justify-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 flex items-center justify-center shrink-0">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
-                <span className="px-2.5 py-1 text-[10px] font-mono rounded bg-slate-900 text-slate-400 border border-slate-800">
-                  REL_v50_database.csv
-                </span>
+                <h3 className="text-base font-bold text-slate-100 leading-snug">
+                  Predicting V50 Ballistic Limit
+                </h3>
               </div>
 
-              <div>
-                <h3 className="text-base font-bold text-slate-100">V50 MATERIAL ANALYTICS</h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Predicts 50% ballistic perforation threshold velocity based on armor plate mechanical properties.
-                </p>
-              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                This module predicts V50, the estimated impact velocity associated with a 50% probability of complete penetration under specified material-testing conditions. It uses available material properties, projectile characteristics, specimen thickness, and impact angle as input features.
+              </p>
 
-              <div className="grid grid-cols-2 gap-3 text-xs font-mono pt-2 border-t border-slate-800/80">
-                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                  <span className="text-slate-500 block text-[10px]">RECORDS</span>
-                  <span className="text-purple-300 font-bold">1,084 records</span>
-                </div>
-                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                  <span className="text-slate-500 block text-[10px]">TARGETS</span>
-                  <span className="text-purple-300 font-bold">1 target</span>
-                </div>
-              </div>
-
-              <div className="text-[11px] font-mono text-slate-400 space-y-1">
-                <div>Inputs: <span className="text-slate-200">16 Material & Projectile Attributes</span></div>
-                <div>Target: <span className="text-slate-200">v50 (m/s)</span></div>
+              <div className="pt-3 border-t border-slate-800/80 space-y-2">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-purple-400 font-mono flex items-center gap-1.5">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>How it helps students and researchers:</span>
+                </h4>
+                <ul className="space-y-2 text-xs text-slate-300">
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0 mt-1.5" />
+                    <span>Explore relationships between material properties and experimentally measured ballistic-limit values.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0 mt-1.5" />
+                    <span>Study regression modelling with numerical and categorical features.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0 mt-1.5" />
+                    <span>Compare predicted values with experimental records and evaluate prediction errors.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0 mt-1.5" />
+                    <span>Support academic research into material testing, data analysis, and predictive modelling.</span>
+                  </li>
+                </ul>
               </div>
             </div>
-
-            <button
-              onClick={() => setActivePage('prediction_lab')}
-              className="mt-6 w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-purple-300 text-xs font-mono border border-slate-800 flex items-center justify-center gap-2 transition-colors"
-            >
-              <span>Test V50 Models</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
           </div>
+        </div>
+
+        {/* Subtle Research Disclaimer */}
+        <div className="p-4 rounded-xl bg-slate-900/70 border border-slate-800 text-center text-xs text-slate-400 flex items-center justify-center gap-2 font-mono">
+          <Info className="w-4 h-4 text-cyan-400 shrink-0" />
+          <span>These modules are intended for educational and research use. Predictions are estimates based on the available data and should not be treated as substitutes for validated experimental testing.</span>
         </div>
       </div>
     </div>
   );
 };
+

@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Home,
+  Calculator,
   PlayCircle,
   FlaskConical,
   BarChart3,
@@ -19,6 +20,7 @@ import { HealthStatus } from '../types';
 
 export type PageId =
   | 'home'
+  | 'calculator'
   | 'simulator'
   | 'prediction_lab'
   | 'analytics'
@@ -51,6 +53,7 @@ export const Sidebar: React.FC<Props> = ({
 }) => {
   const navItems = [
     { id: 'home', label: 'Home', icon: Home },
+    { id: 'calculator', label: 'Calculator', icon: Calculator },
     { id: 'simulator', label: 'Simulator', icon: PlayCircle },
     { id: 'prediction_lab', label: 'Prediction Lab', icon: FlaskConical },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
