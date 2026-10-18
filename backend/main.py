@@ -23,7 +23,9 @@ from typing import Dict, Any, List
 from backend.services.model_loader import load_all_models
 from backend.services.analytics_service import cache_dataset_summaries, get_dataset_summary, get_all_datasets_metadata
 from backend.services.prediction_service import predict_trajectory_service, predict_performance_service, predict_v50_service
+from backend.services.simulator_service import run_simulation
 from backend.schemas.input_models import TrajectoryInput, PerformanceInput, V50Input
+from backend.schemas.trajectory import SimulationRequest, SimulationResponse
 from backend.schemas.prediction import PredictionResult
 from backend.utils.model_registry import registry
 
@@ -136,3 +138,16 @@ def get_performance_summary():
 def get_v50_summary():
     """GET /api/dataset/summary/v50 - Returns cached summary for REL_v50_database_20230527.csv."""
     return get_dataset_summary("v50")
+
+# 11. Interactive Simulator Run Endpoint
+@app.post("/api/simulator/run", response_model=SimulationResponse)
+def simulate_trajectory(input_data: SimulationRequest):
+    """POST /api/simulator/run - Computes numerical trajectory integration with aerodynamic drag."""
+    try:
+        return run_simulation(input_data)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Simulation calculation error: {str(e)}"
+        )
+

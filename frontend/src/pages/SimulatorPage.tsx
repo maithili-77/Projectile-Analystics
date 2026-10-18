@@ -620,12 +620,21 @@ export const SimulatorPage: React.FC = () => {
                     points={simulationRes?.points || []}
                     maxRange={prediction?.prediction?.range_actual || simulationRes?.max_range || 1000}
                     maxHeight={prediction?.prediction?.max_height_actual || simulationRes?.max_height || 500}
+                    velocity={trajVelocity}
+                    angleDeg={trajAngleDeg}
+                    gravity={trajGravity}
+                    predictedRange={prediction?.prediction?.range_actual}
+                    predictedHeight={prediction?.prediction?.max_height_actual}
+                    onFire={handlePredict}
+                    loading={loading}
                   />
                 ) : (
                   <Trajectory3DCanvas
                     points={simulationRes?.points || []}
                     maxRange={prediction?.prediction?.range_actual || simulationRes?.max_range || 1000}
                     maxHeight={prediction?.prediction?.max_height_actual || simulationRes?.max_height || 500}
+                    angleDeg={trajAngleDeg}
+                    predictedRange={prediction?.prediction?.range_actual}
                   />
                 )}
               </div>
