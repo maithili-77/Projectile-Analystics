@@ -36,7 +36,7 @@ export const V50Visualizer: React.FC<V50VisualizerProps> = ({
   }, [v50, material, thickness]);
 
   return (
-    <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-4 font-mono text-xs">
+    <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex flex-col justify-between h-full space-y-4 font-mono text-xs">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
         <div>
           <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-sans">

@@ -251,20 +251,21 @@ export const SimulatorPage: React.FC = () => {
       </div>
 
       {/* Main 3-Column Simulator Workspace */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
 
-        {/* COLUMN 1: Dynamic Input Form (4 Cols on LG) */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-mono">
-                <Sliders className="w-4 h-4 text-cyan-400" />
-                <span>Model Input Features</span>
-              </h3>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
-                {selectedDataset === 'trajectory' ? '3 Features' : selectedDataset === 'performance' ? '5 Features' : '16 Attributes'}
-              </span>
-            </div>
+        {/* COLUMN 1: Dynamic Input Form (3 Cols on LG) */}
+        <div className="lg:col-span-3 flex flex-col">
+          <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex flex-col justify-between h-full space-y-4">
+            <div>
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 mb-4">
+                <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-mono">
+                  <Sliders className="w-4 h-4 text-cyan-400" />
+                  <span>Model Input Features</span>
+                </h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
+                  {selectedDataset === 'trajectory' ? '3 Features' : selectedDataset === 'performance' ? '5 Features' : '16 Attributes'}
+                </span>
+              </div>
 
             {/* FORM A: TRAJECTORY INPUTS */}
             {selectedDataset === 'trajectory' && (
@@ -429,9 +430,9 @@ export const SimulatorPage: React.FC = () => {
 
                 <div className="pt-2 border-t border-slate-800 space-y-1.5">
                   <div className="text-[10px] font-bold text-slate-400 uppercase">Select Target Variables:</div>
-                  <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                  <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                     {['V100', 'V200', 'E100', 'E200', 'BD100', 'BD200'].map((tgt) => (
-                      <label key={tgt} className="flex items-center gap-1 cursor-pointer bg-slate-900 p-1.5 rounded border border-slate-800">
+                      <label key={tgt} className="flex items-center gap-1.5 cursor-pointer bg-slate-900/90 p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors">
                         <input
                           type="checkbox"
                           checked={perfTargets.includes(tgt)}
@@ -440,9 +441,9 @@ export const SimulatorPage: React.FC = () => {
                             else setPerfTargets(perfTargets.filter((t) => t !== tgt));
                             markInputsChanged();
                           }}
-                          className="accent-emerald-500"
+                          className="accent-emerald-500 rounded"
                         />
-                        <span>{tgt}</span>
+                        <span className="font-mono text-slate-300">{tgt}</span>
                       </label>
                     ))}
                   </div>
@@ -549,16 +550,17 @@ export const SimulatorPage: React.FC = () => {
               </div>
             )}
 
-            {/* Error Message Alert */}
-            {error && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
+            </div>
 
-            {/* Predict Button */}
-            <div className="pt-2">
+            {/* Bottom Actions: Error Message & Run Prediction Button */}
+            <div className="space-y-2 pt-2 border-t border-slate-800/60">
+              {error && (
+                <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={handlePredict}
@@ -581,18 +583,16 @@ export const SimulatorPage: React.FC = () => {
           </div>
         </div>
 
-        {/* COLUMN 2: Dedicated Visualization Canvas (5 Cols on LG) */}
-        <div className="lg:col-span-5 space-y-4">
-          
-          {/* Header Controls for Visualization */}
-          <div className="glass-panel p-4 rounded-2xl border border-slate-800 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-sans">
-                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
-                <span>ANIMATED DEDICATED VISUALIZER</span>
-              </h3>
+        {/* COLUMN 2: Dedicated Visualization Canvas (6 Cols on LG) */}
+        <div className="lg:col-span-6 flex flex-col">
+          {selectedDataset === 'trajectory' ? (
+            <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex flex-col justify-between h-full space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-mono">
+                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+                  <span>ANIMATED DEDICATED VISUALIZER</span>
+                </h3>
 
-              {selectedDataset === 'trajectory' && (
                 <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800 text-[10px] font-mono">
                   <button
                     type="button"
@@ -609,12 +609,9 @@ export const SimulatorPage: React.FC = () => {
                     3D View
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
 
-            {/* Visualizer Renderer based on selected Dataset */}
-            {selectedDataset === 'trajectory' ? (
-              <div className="space-y-4">
+              <div className="space-y-4 flex-1">
                 {activeView === '2d' ? (
                   <TrajectoryCanvas2D
                     points={simulationRes?.points || []}
@@ -638,110 +635,142 @@ export const SimulatorPage: React.FC = () => {
                   />
                 )}
               </div>
-            ) : selectedDataset === 'performance' ? (
-              <PerformanceVisualizer
-                v0={perfV0}
-                v100={prediction?.prediction?.V100}
-                v200={prediction?.prediction?.V200}
-                e0={Math.round((0.5 * (perfWeight / 7000) * (perfV0 ** 2)) / 32.174)}
-                e100={prediction?.prediction?.E100}
-                e200={prediction?.prediction?.E200}
-                bd100={prediction?.prediction?.BD100}
-                bd200={prediction?.prediction?.BD200}
-                cartridgeName={perfCartridge}
-                firearmType={perfType}
-                weightGrains={perfWeight}
-              />
-            ) : (
-              <V50Visualizer
-                v50={prediction?.prediction?.v50 || 0}
-                material={v50Material}
-                thickness={v50Thickness}
-                projType={v50ProjType}
-                calibre={v50Calibre}
-                projMass={v50ProjMass}
-                yieldStrength={v50Yield}
-                hardness={v50Hardness}
-                density={v50Density}
-              />
-            )}
-          </div>
+            </div>
+          ) : selectedDataset === 'performance' ? (
+            <PerformanceVisualizer
+              v0={perfV0}
+              v100={prediction?.prediction?.V100}
+              v200={prediction?.prediction?.V200}
+              e0={Math.round((0.5 * (perfWeight / 7000) * (perfV0 ** 2)) / 32.174)}
+              e100={prediction?.prediction?.E100}
+              e200={prediction?.prediction?.E200}
+              bd100={prediction?.prediction?.BD100}
+              bd200={prediction?.prediction?.BD200}
+              cartridgeName={perfCartridge}
+              firearmType={perfType}
+              weightGrains={perfWeight}
+              bc={perfBC}
+              onFire={handlePredict}
+              loading={loading}
+            />
+          ) : (
+            <V50Visualizer
+              v50={prediction?.prediction?.v50 || 0}
+              material={v50Material}
+              thickness={v50Thickness}
+              projType={v50ProjType}
+              calibre={v50Calibre}
+              projMass={v50ProjMass}
+              yieldStrength={v50Yield}
+              hardness={v50Hardness}
+              density={v50Density}
+            />
+          )}
         </div>
 
         {/* COLUMN 3: Prediction Output Cards (3 Cols on LG) */}
-        <div className="lg:col-span-3 space-y-4 font-mono text-xs">
-          <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-4">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-sans border-b border-slate-800/80 pb-3 flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-cyan-400" />
-              <span>MODEL PREDICTIONS</span>
-            </h3>
-
-            {/* TRAJECTORY PREDICTIONS */}
-            {selectedDataset === 'trajectory' && (
-              <>
-                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Predicted Range (range_actual)</div>
-                  <div className="text-2xl font-extrabold text-cyan-300">
-                    {(prediction?.prediction?.range_actual || 0).toLocaleString()} m
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Predicted Max Height</div>
-                  <div className="text-2xl font-extrabold text-indigo-300">
-                    {(prediction?.prediction?.max_height_actual || 0).toLocaleString()} m
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* PERFORMANCE PREDICTIONS */}
-            {selectedDataset === 'performance' && (
-              <div className="space-y-2">
-                {Object.entries(prediction?.prediction || {}).map(([targetKey, val]) => (
-                  <div key={targetKey} className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
-                    <span className="text-slate-400 font-bold">{targetKey}:</span>
-                    <span className="text-emerald-300 font-bold text-sm">
-                      {val} {targetKey.startsWith('V') ? 'fps' : targetKey.startsWith('E') ? 'ft-lbs' : 'in'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* V50 PREDICTION */}
-            {selectedDataset === 'v50' && (
-              <div className="p-5 rounded-xl bg-purple-500/10 border border-purple-500/30 space-y-2 text-center">
-                <div className="text-[10px] text-purple-300 font-bold uppercase tracking-wider">50% Perforation Limit V50</div>
-                <div className="text-3xl font-extrabold text-purple-200">
-                  {(prediction?.prediction?.v50 || 0).toLocaleString()} m/s
-                </div>
-                <div className="text-[10px] text-slate-400">Impact Velocity Threshold</div>
-              </div>
-            )}
-
-            {/* Domain Coverage */}
-            <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-slate-400 uppercase font-bold">Domain Coverage</span>
-                <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30 text-[10px]">
-                  {domainScorePct}%
+        <div className="lg:col-span-3 flex flex-col font-mono text-xs">
+          <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex flex-col justify-between h-full space-y-4">
+            <div>
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 mb-4">
+                <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-sans flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-cyan-400" />
+                  <span>MODEL PREDICTIONS</span>
+                </h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
+                  {selectedDataset === 'performance' ? 'V100/V200 ML' : 'ML Pipeline'}
                 </span>
               </div>
-              <div className="text-[10px] text-slate-400 leading-relaxed font-sans">
-                {prediction?.domain_coverage_explanation || 'Input vector evaluated against training bounds.'}
-              </div>
+
+              {/* TRAJECTORY PREDICTIONS */}
+              {selectedDataset === 'trajectory' && (
+                <div className="space-y-3">
+                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <div className="text-[10px] text-slate-400 uppercase font-bold">Predicted Range (range_actual)</div>
+                    <div className="text-2xl font-extrabold text-cyan-300">
+                      {(prediction?.prediction?.range_actual || 0).toLocaleString()} m
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <div className="text-[10px] text-slate-400 uppercase font-bold">Predicted Max Height</div>
+                    <div className="text-2xl font-extrabold text-indigo-300">
+                      {(prediction?.prediction?.max_height_actual || 0).toLocaleString()} m
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* PERFORMANCE PREDICTIONS */}
+              {selectedDataset === 'performance' && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    {['V100', 'V200', 'E100', 'E200', 'BD100', 'BD200'].map((targetKey) => {
+                      const val = prediction?.prediction?.[targetKey];
+                      const isV = targetKey.startsWith('V');
+                      const isE = targetKey.startsWith('E');
+                      const unit = isV ? 'fps' : isE ? 'ft·lbs' : 'in';
+                      const colorClass = isV ? 'text-cyan-300' : isE ? 'text-emerald-300' : 'text-purple-300';
+                      const badgeClass = isV ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' : isE ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-purple-500/10 text-purple-400 border-purple-500/30';
+
+                      return (
+                        <div key={targetKey} className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between">
+                          <div className="flex items-center justify-between">
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badgeClass}`}>{targetKey}</span>
+                            <span className="text-[9px] text-slate-500">{unit}</span>
+                          </div>
+                          <div className={`text-base font-extrabold mt-1 font-mono ${colorClass}`}>
+                            {val !== undefined ? val : '---'}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* V50 PREDICTION */}
+              {selectedDataset === 'v50' && (
+                <div className="p-5 rounded-xl bg-purple-500/10 border border-purple-500/30 space-y-2 text-center">
+                  <div className="text-[10px] text-purple-300 font-bold uppercase tracking-wider">50% Perforation Limit V50</div>
+                  <div className="text-3xl font-extrabold text-purple-200">
+                    {(prediction?.prediction?.v50 || 0).toLocaleString()} m/s
+                  </div>
+                  <div className="text-[10px] text-slate-400">Impact Velocity Threshold</div>
+                </div>
+              )}
             </div>
 
-            {/* Active Model Name */}
-            <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 text-[10px] space-y-1">
-              <span className="text-slate-500 block uppercase">Loaded Model</span>
-              <span className="text-slate-200 font-bold">{prediction?.model_name || 'Random Forest Pipeline'}</span>
+            {/* Pinned Bottom Metadata: Domain Coverage & Loaded Model */}
+            <div className="space-y-3 pt-3 border-t border-slate-800/60">
+              {/* Domain Coverage */}
+              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold">Domain Coverage</span>
+                  <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30 text-[10px]">
+                    {domainScorePct}%
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-400 leading-relaxed font-sans">
+                  {prediction?.domain_coverage_explanation || 'Input vector evaluated against training bounds.'}
+                </div>
+              </div>
+
+              {/* Active Model Name */}
+              <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[10px] flex items-center justify-between">
+                <span className="text-slate-500 uppercase">Loaded Model</span>
+                <span className="text-slate-200 font-bold">{prediction?.model_name || 'Random Forest Pipeline'}</span>
+              </div>
             </div>
           </div>
         </div>
 
       </div>
+
+      {/* FULL-WIDTH DEDICATED GRAPHS CONTAINER BELOW MODEL INPUT FEATURES & WORKSPACE */}
+      {selectedDataset === 'performance' && (
+        <div id="performance-graphs-slot" className="w-full"></div>
+      )}
 
       {/* REQUIREMENT 6: RESEARCH INSIGHTS AND MODEL COMPARISON SECTION */}
       <div className="space-y-6 pt-6 border-t border-slate-800">
