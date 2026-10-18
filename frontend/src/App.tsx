@@ -5,7 +5,6 @@ import { HomePage } from './pages/HomePage';
 import { CalculatorPage } from './pages/CalculatorPage';
 import { SimulatorPage } from './pages/SimulatorPage';
 import { HistoryPage } from './pages/HistoryPage';
-import { ReportsPage } from './pages/ReportsPage';
 import { AboutPage } from './pages/AboutPage';
 import { api } from './services/api';
 import { HealthStatus } from './types';
@@ -45,7 +44,6 @@ export const App: React.FC = () => {
           {activePage === 'calculator' && <CalculatorPage setActivePage={setActivePage} />}
           {activePage === 'simulator' && <SimulatorPage />}
           {activePage === 'history' && <HistoryPage />}
-          {activePage === 'reports' && <ReportsPage />}
           {activePage === 'about' && <AboutPage />}
         </main>
 

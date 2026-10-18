@@ -104,13 +104,6 @@ export const OverviewPage: React.FC<Props> = ({ setActiveTab, health }) => {
               <PlayCircle className="w-4 h-4" />
               <span>Launch Interactive Simulator</span>
             </button>
-            <button
-              onClick={() => setActiveTab('report')}
-              className="px-5 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center gap-2 transition-all"
-            >
-              <Compass className="w-4 h-4 text-cyan-400" />
-              <span>View Academic Research Paper</span>
-            </button>
           </div>
         </div>
       </div>

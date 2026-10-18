@@ -7,7 +7,6 @@ import {
   BarChart3,
   Cpu,
   Database,
-  FileText,
   History,
   Info,
   ChevronLeft,
@@ -23,7 +22,6 @@ export type PageId =
   | 'calculator'
   | 'simulator'
   | 'history'
-  | 'reports'
   | 'about';
 
 interface Props {
@@ -52,7 +50,6 @@ export const Sidebar: React.FC<Props> = ({
     { id: 'calculator', label: 'Calculator', icon: Calculator },
     { id: 'simulator', label: 'Simulator', icon: PlayCircle },
     { id: 'history', label: 'Prediction History', icon: History },
-    { id: 'reports', label: 'Research Reports', icon: FileText },
     { id: 'about', label: 'About', icon: Info },
   ];
 

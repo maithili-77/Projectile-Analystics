@@ -24,8 +24,7 @@
 6. **Model Insights**: Model performance evaluation matrices comparing Random Forest, Decision Tree, Gradient Boosting, and Linear Regression with feature importance rankings.
 7. **Dataset Explorer**: Paginated tabular browser for all 3 datasets (`accurate_ballastic.csv`, `ballistics_500.csv`, `REL_v50_database_20230527.csv`) with live search and CSV export.
 8. **Prediction History**: Session prediction log with detail inspection, comparison mode, and JSON export.
-9. **Research Report**: Built-in formatted academic paper viewer detailing equations, methodology, and model benchmarks.
-10. **Deployment**: Containerized Docker and `docker-compose` production setup scripts.
+9. **Deployment**: Containerized Docker and `docker-compose` production setup scripts.
 
 ---
 

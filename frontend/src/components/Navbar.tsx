@@ -8,8 +8,7 @@ import {
   BarChart3,
   Cpu,
   Database,
-  History,
-  FileText
+  History
 } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { HealthStatus } from '../types';
@@ -23,8 +22,7 @@ export type TabId =
   | 'analytics'
   | 'insights'
   | 'explorer'
-  | 'history'
-  | 'report';
+  | 'history';
 
 interface Props {
   activeTab: TabId;
@@ -44,7 +42,6 @@ export const Navbar: React.FC<Props> = ({ activeTab, setActiveTab, health, loadi
     { id: 'insights', label: 'Model Insights', icon: Cpu },
     { id: 'explorer', label: 'Dataset Explorer', icon: Database },
     { id: 'history', label: 'Prediction History', icon: History },
-    { id: 'report', label: 'Research Report', icon: FileText },
   ];
 
   return (
