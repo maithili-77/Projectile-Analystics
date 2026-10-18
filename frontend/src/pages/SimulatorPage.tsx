@@ -772,75 +772,74 @@ export const SimulatorPage: React.FC = () => {
         <div id="performance-graphs-slot" className="w-full"></div>
       )}
 
-      {/* REQUIREMENT 6: RESEARCH INSIGHTS AND MODEL COMPARISON SECTION */}
-      <div className="space-y-6 pt-6 border-t border-slate-800">
-        <div className="flex items-center gap-2 font-mono">
-          <BookOpen className="w-5 h-5 text-cyan-400" />
-          <h2 className="text-base font-bold text-slate-100 uppercase tracking-wider font-sans">
-            RESEARCH INSIGHTS AND MODEL COMPARISON
-          </h2>
-        </div>
+      {/* REQUIREMENT 6: RESEARCH INSIGHTS AND MODEL COMPARISON SECTION (Hidden in Predict Range and Max Height) */}
+      {selectedDataset !== 'trajectory' && (
+        <div className="space-y-6 pt-6 border-t border-slate-800">
+          <div className="flex items-center gap-2 font-mono">
+            <BookOpen className="w-5 h-5 text-cyan-400" />
+            <h2 className="text-base font-bold text-slate-100 uppercase tracking-wider font-sans">
+              RESEARCH INSIGHTS AND MODEL COMPARISON
+            </h2>
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono text-xs">
-          
-          {/* Card 1: Domain Coverage & Bounds Validation */}
-          <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-3">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-sans flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Training Domain Bounds Validation</span>
-            </h3>
-            <p className="text-slate-300 text-[11px] leading-relaxed font-sans">
-              Evaluates if user-selected input features lie strictly within the experimental range of the training dataset ({
-                selectedDataset === 'trajectory' ? 'accurate_ballastic.csv' :
-                selectedDataset === 'performance' ? 'ballistics_500.csv' : 'REL_v50_database.csv'
-              }).
-            </p>
-            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
-              <span className="text-slate-400">Coverage Score:</span>
-              <span className="text-cyan-300 font-bold">{domainScorePct}% In-Domain</span>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono text-xs">
+            {/* Card 1: Domain Coverage & Bounds Validation */}
+            <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-3">
+              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-sans flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Training Domain Bounds Validation</span>
+              </h3>
+              <p className="text-slate-300 text-[11px] leading-relaxed font-sans">
+                Evaluates if user-selected input features lie strictly within the experimental range of the training dataset ({
+                  selectedDataset === 'performance' ? 'ballistics_500.csv' : 'REL_v50_database.csv'
+                }).
+              </p>
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                <span className="text-slate-400">Coverage Score:</span>
+                <span className="text-cyan-300 font-bold">{domainScorePct}% In-Domain</span>
+              </div>
+            </div>
+
+            {/* Card 2: Offline Model Benchmark Metrics */}
+            <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-3">
+              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-sans flex items-center gap-2">
+                <BarChart2 className="w-4 h-4 text-cyan-400" />
+                <span>Offline Model Evaluation Metrics</span>
+              </h3>
+              <div className="space-y-2 text-[11px]">
+                <div className="flex justify-between p-2 rounded bg-slate-900 border border-slate-800">
+                  <span className="text-slate-400">R² Coefficient of Determination:</span>
+                  <span className="text-emerald-300 font-bold">{prediction?.metrics?.R2 ?? '0.96+'}</span>
+                </div>
+                <div className="flex justify-between p-2 rounded bg-slate-900 border border-slate-800">
+                  <span className="text-slate-400">Root Mean Squared Error (RMSE):</span>
+                  <span className="text-slate-200 font-bold">{prediction?.metrics?.RMSE ?? '34.2'}</span>
+                </div>
+                <div className="flex justify-between p-2 rounded bg-slate-900 border border-slate-800">
+                  <span className="text-slate-400">Mean Absolute Error (MAE):</span>
+                  <span className="text-slate-200 font-bold">{prediction?.metrics?.MAE ?? '22.1'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Academic Limitations & Non-Operational Disclaimer */}
+            <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-3">
+              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-sans flex items-center gap-2">
+                <Info className="w-4 h-4 text-purple-400" />
+                <span>Academic Model Limitations</span>
+              </h3>
+              <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
+                Machine learning models generate statistical estimations based on recorded training distributions. Predictions should be evaluated alongside reference physics calculations and do not replace validated laboratory or range testing.
+              </p>
             </div>
           </div>
 
-          {/* Card 2: Offline Model Benchmark Metrics */}
-          <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-3">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-sans flex items-center gap-2">
-              <BarChart2 className="w-4 h-4 text-cyan-400" />
-              <span>Offline Model Evaluation Metrics</span>
-            </h3>
-            <div className="space-y-2 text-[11px]">
-              <div className="flex justify-between p-2 rounded bg-slate-900 border border-slate-800">
-                <span className="text-slate-400">R² Coefficient of Determination:</span>
-                <span className="text-emerald-300 font-bold">{prediction?.metrics?.R2 ?? '0.96+'}</span>
-              </div>
-              <div className="flex justify-between p-2 rounded bg-slate-900 border border-slate-800">
-                <span className="text-slate-400">Root Mean Squared Error (RMSE):</span>
-                <span className="text-slate-200 font-bold">{prediction?.metrics?.RMSE ?? '34.2'}</span>
-              </div>
-              <div className="flex justify-between p-2 rounded bg-slate-900 border border-slate-800">
-                <span className="text-slate-400">Mean Absolute Error (MAE):</span>
-                <span className="text-slate-200 font-bold">{prediction?.metrics?.MAE ?? '22.1'}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Academic Limitations & Non-Operational Disclaimer */}
-          <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-3">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-sans flex items-center gap-2">
-              <Info className="w-4 h-4 text-purple-400" />
-              <span>Academic Model Limitations</span>
-            </h3>
-            <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
-              Machine learning models generate statistical estimations based on recorded training distributions. Predictions should be evaluated alongside reference physics calculations and do not replace validated laboratory or range testing.
-            </p>
-          </div>
-
+          {/* Feature Importance Panel (If available) */}
+          {prediction?.feature_importances && (
+            <ModelExplanation featureImportances={prediction.feature_importances} />
+          )}
         </div>
-
-        {/* Feature Importance Panel (If available) */}
-        {prediction?.feature_importances && (
-          <ModelExplanation featureImportances={prediction.feature_importances} />
-        )}
-      </div>
+      )}
 
     </div>
   );
