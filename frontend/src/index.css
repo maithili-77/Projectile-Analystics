@@ -5,6 +5,13 @@
 @layer base {
   body {
     @apply bg-slate-950 text-slate-100 min-h-screen overflow-x-hidden;
+    background-color: #F7F5F0;
+    color: #172536;
+  }
+
+  ::selection {
+    background-color: #FF8A24;
+    color: #FFFFFF;
   }
 }
 
@@ -14,54 +21,123 @@
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: #F7F5F0;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: #E5E1DA;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #687587;
 }
 
-/* Glassmorphism utility classes */
+/* Sidebar and Panel Surfaces */
+aside {
+  background-color: #FFFFFF !important;
+}
+
+/* Cards and Panels */
 .glass-panel {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #FFFFFF;
+  border: 1px solid #E5E1DA;
+  box-shadow: 0 1px 3px 0 rgba(23, 37, 54, 0.04), 0 1px 2px -1px rgba(23, 37, 54, 0.04);
 }
 
 .glass-card {
-  background: rgba(30, 41, 59, 0.5);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #FFFFFF;
+  border: 1px solid #E5E1DA;
+  box-shadow: 0 1px 3px 0 rgba(23, 37, 54, 0.04);
   transition: all 0.25s ease-in-out;
 }
 
 .glass-card:hover {
-  background: rgba(30, 41, 59, 0.75);
-  border-color: rgba(34, 211, 238, 0.25);
-  box-shadow: 0 10px 30px -10px rgba(34, 211, 238, 0.15);
+  background: #FFF9F1;
+  border-color: #FF8A24;
+  box-shadow: 0 10px 25px -5px rgba(255, 138, 36, 0.12);
 }
 
 /* Background grid pattern */
 .bg-grid-pattern {
   background-size: 32px 32px;
   background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(to right, rgba(229, 225, 218, 0.6) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(229, 225, 218, 0.6) 1px, transparent 1px);
 }
 
-/* Glowing text gradients */
+/* Glowing text gradients with warm palette */
 .text-gradient-cyan {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-400;
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-[#FF8A24] via-[#F47716] to-[#D96509];
 }
 
 .text-gradient-amber {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-amber-400 via-orange-300 to-rose-400;
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-[#FF8A24] via-[#F47716] to-[#D96509];
 }
 
 .text-gradient-emerald {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400;
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-[#047857] via-[#059669] to-[#10B981];
+}
+
+/* Text readability and contrast on light surfaces */
+strong.text-white {
+  color: #172536 !important;
+}
+
+button.hover\:text-white:hover {
+  color: #172536 !important;
+}
+
+/* Form Controls Adaptations */
+input, select, textarea {
+  color-scheme: light;
+}
+
+select option {
+  background-color: #FFFFFF;
+  color: #172536;
+}
+
+input[type="range"] {
+  accent-color: #FF8A24;
+}
+
+/* Recharts Global Light Theme Overrides */
+.recharts-cartesian-grid line,
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: #E5E1DA !important;
+}
+
+.recharts-cartesian-axis-line {
+  stroke: #E5E1DA !important;
+}
+
+.recharts-cartesian-axis-tick-line {
+  stroke: #E5E1DA !important;
+}
+
+.recharts-text,
+.recharts-cartesian-axis-tick-value {
+  fill: #687587 !important;
+}
+
+.recharts-legend-item-text {
+  color: #687587 !important;
+}
+
+.recharts-default-tooltip {
+  background-color: #FFFFFF !important;
+  border: 1px solid #E5E1DA !important;
+  border-radius: 0.5rem !important;
+  color: #172536 !important;
+  box-shadow: 0 4px 12px rgba(23, 37, 54, 0.08) !important;
+}
+
+.recharts-tooltip-item {
+  color: #172536 !important;
+}
+
+/* Mobile drawer and modal backdrop */
+.fixed.inset-0.z-40.bg-slate-950\/80,
+.fixed.inset-0.z-50.bg-slate-950\/80 {
+  background-color: rgba(23, 37, 54, 0.45) !important;
 }
