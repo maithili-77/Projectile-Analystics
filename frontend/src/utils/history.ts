@@ -141,7 +141,7 @@ export function loadSamplePredictionHistory(): PredictionHistoryItem[] {
       id: `sample_v50_${Date.now()}`,
       type: 'V50',
       timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-      model_name: 'Random Forest ColumnTransformer (ballistics_v50_model.pkl)',
+      model_name: 'Random Forest ColumnTransformer',
       domain_score: 0.95,
       domain_coverage_explanation: 'Steel plate projectile impact simulation within REL V50 training distribution.',
       source_page: 'Interactive Multi-Domain Simulator',

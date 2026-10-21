@@ -453,13 +453,8 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage 
             </h1>
 
             <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-              Calculate the 50% ballistic perforation limit velocity (<code className="text-purple-300 bg-slate-900 px-1.5 py-0.5 rounded font-mono">V50</code>) and evaluate material penetration probability curves using our trained ColumnTransformer Random Forest pipeline (<code className="text-purple-300 bg-slate-900 px-1.5 py-0.5 rounded font-mono">ballistics_v50_model.pkl</code>).
+              Calculate the 50% ballistic perforation limit velocity (<code className="text-purple-300 bg-slate-900 px-1.5 py-0.5 rounded font-mono">V50</code>) and evaluate material penetration probability curves using our trained ColumnTransformer Random Forest pipeline.
             </p>
-          </div>
-
-          <div className="flex items-center gap-2 bg-slate-900/90 px-3.5 py-2.5 rounded-xl border border-slate-800 text-xs font-mono text-slate-300 shrink-0">
-            <Activity className="w-4 h-4 text-purple-400" />
-            <span>Dataset 3: REL_v50_database</span>
           </div>
         </div>
       </div>

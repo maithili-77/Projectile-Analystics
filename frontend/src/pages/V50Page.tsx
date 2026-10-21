@@ -66,7 +66,7 @@ export const V50Page: React.FC = () => {
             <span>Terminal Penetration V50 Predictor</span>
           </h1>
           <p className="text-xs text-slate-400 font-mono">
-            Random Forest ColumnTransformer Pipeline &bull; ballistics_v50_model.pkl (Dataset 3)
+            Random Forest ColumnTransformer Pipeline
           </p>
         </div>
       </div>
