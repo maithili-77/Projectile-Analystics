@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   Activity,
   Zap,
-  Target
+  Target,
+  Crosshair
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -42,6 +43,67 @@ interface V50PresetItem {
   input: V50Input;
   isBuiltIn?: boolean;
 }
+
+interface MaterialDefault {
+  density: number;
+  modulus: number;
+  hardness: number;
+  yield: number;
+  PR: number;
+  UTS: number;
+  elongation: number;
+  'Ludwik-n': number;
+}
+
+const MATERIAL_DEFAULTS: Record<string, MaterialDefault> = {
+  Steel: {
+    density: 7.85,
+    modulus: 210.0,
+    hardness: 200.0,
+    yield: 400.0,
+    PR: 0.3,
+    UTS: 600.0,
+    elongation: 15.0,
+    'Ludwik-n': 0.2
+  },
+  Aluminum: {
+    density: 2.7,
+    modulus: 70.0,
+    hardness: 120.0,
+    yield: 503.0,
+    PR: 0.33,
+    UTS: 572.0,
+    elongation: 11.0,
+    'Ludwik-n': 0.15
+  },
+  Titanium: {
+    density: 4.43,
+    modulus: 114.0,
+    hardness: 330.0,
+    yield: 880.0,
+    PR: 0.34,
+    UTS: 950.0,
+    elongation: 14.0,
+    'Ludwik-n': 0.12
+  },
+  Composite: {
+    density: 1.44,
+    modulus: 45.0,
+    hardness: 85.0,
+    yield: 250.0,
+    PR: 0.38,
+    UTS: 380.0,
+    elongation: 8.0,
+    'Ludwik-n': 0.10
+  }
+};
+
+const PROJ_DEFAULTS: Record<string, { calibre: number; proj_mass: number; proj_density: number; proj_hardness: number }> = {
+  AP: { calibre: 12.7, proj_mass: 45.0, proj_density: 7.85, proj_hardness: 60.0 },
+  FSP: { calibre: 20.0, proj_mass: 53.8, proj_density: 7.85, proj_hardness: 60.0 },
+  Ball: { calibre: 7.62, proj_mass: 9.5, proj_density: 11.34, proj_hardness: 25.0 },
+  'Steel Core': { calibre: 7.62, proj_mass: 9.6, proj_density: 7.85, proj_hardness: 60.0 }
+};
 
 const BUILT_IN_V50_PRESETS: V50PresetItem[] = [
   {
@@ -140,7 +202,7 @@ const BUILT_IN_V50_PRESETS: V50PresetItem[] = [
 
 const V50_PRESETS_STORAGE_KEY = 'ballistix_v50_calculator_presets';
 
-export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
+export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage }) => {
   // Input parameters state
   const [input, setInput] = useState<V50Input>(BUILT_IN_V50_PRESETS[0].input);
 
@@ -149,6 +211,10 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [showTable, setShowTable] = useState<boolean>(false);
+  const [calcCount, setCalcCount] = useState<number>(0);
+
+  // Interactive Test Velocity Probe state
+  const [testVelocity, setTestVelocity] = useState<number>(619);
 
   // Presets state
   const [userPresets, setUserPresets] = useState<V50PresetItem[]>([]);
@@ -173,15 +239,31 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
 
   const allPresets = useMemo(() => [...BUILT_IN_V50_PRESETS, ...userPresets], [userPresets]);
 
-  const handlePredict = async (customInput = input) => {
+  const handlePredict = async (customInput?: V50Input) => {
+    const targetInput = customInput || input;
     setLoading(true);
     setError(null);
     try {
-      const res = await api.predictV50(customInput);
+      const res = await api.predictV50(targetInput);
       setPrediction(res);
+      setCalcCount((prev) => prev + 1);
+
+      const predictedV50 = res.prediction?.v50;
+      if (typeof predictedV50 === 'number' && predictedV50 > 0) {
+        setTestVelocity(Math.round(predictedV50));
+      }
     } catch (err: any) {
       console.error('V50 prediction error:', err);
-      setError(err?.response?.data?.detail || err?.message || 'Failed to calculate V50 ballistic limit velocity.');
+      const detail = err?.response?.data?.detail;
+      let errorMsg = 'Failed to calculate V50 ballistic limit velocity.';
+      if (typeof detail === 'string') {
+        errorMsg = detail;
+      } else if (Array.isArray(detail)) {
+        errorMsg = detail.map((d: any) => d.msg || JSON.stringify(d)).join('; ');
+      } else if (err?.message) {
+        errorMsg = err.message;
+      }
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -202,6 +284,41 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
       setInput(target.input);
       handlePredict(target.input);
     }
+  };
+
+  const updateField = (field: keyof V50Input, value: any) => {
+    setInput((prev) => ({ ...prev, [field]: value }));
+    setSelectedPresetId('custom-active');
+  };
+
+  const handleProjTypeChange = (newType: string) => {
+    const defaults = PROJ_DEFAULTS[newType] || PROJ_DEFAULTS.AP;
+    setInput((prev) => ({
+      ...prev,
+      proj_type: newType,
+      calibre: defaults.calibre,
+      proj_mass: defaults.proj_mass,
+      proj_density: defaults.proj_density,
+      proj_hardness: defaults.proj_hardness
+    }));
+    setSelectedPresetId('custom-active');
+  };
+
+  const handleMaterialChange = (newMat: string) => {
+    const defaults = MATERIAL_DEFAULTS[newMat] || MATERIAL_DEFAULTS.Steel;
+    setInput((prev) => ({
+      ...prev,
+      Material: newMat,
+      density: defaults.density,
+      modulus: defaults.modulus,
+      hardness: defaults.hardness,
+      yield: defaults.yield,
+      PR: defaults.PR,
+      UTS: defaults.UTS,
+      elongation: defaults.elongation,
+      'Ludwik-n': defaults['Ludwik-n']
+    }));
+    setSelectedPresetId('custom-active');
   };
 
   const handleSavePreset = () => {
@@ -247,13 +364,13 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
   // Generate Sigmoid S-Curve Data for Perforation Probability (%) vs Velocity (m/s)
   const curveData = useMemo(() => {
     if (!prediction) return [];
-    const v50 = prediction.prediction.v50 || 700;
+    const v50 = prediction.prediction?.v50 || 619.4;
     const slope = 0.035; // typical ballistic limit transition steepness
 
     const points = [];
-    const minV = Math.max(50, Math.round(v50 - 250));
+    const minV = Math.max(30, Math.round(v50 - 250));
     const maxV = Math.round(v50 + 250);
-    const step = 10;
+    const step = 5;
 
     for (let v = minV; v <= maxV; v += step) {
       const prob = 1 / (1 + Math.exp(-slope * (v - v50)));
@@ -265,6 +382,18 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
       });
     }
 
+    const roundedV50 = Math.round(v50);
+    if (!points.some((p) => p.velocity === roundedV50)) {
+      const prob50 = 1 / (1 + Math.exp(-slope * (roundedV50 - v50)));
+      const energy50 = Math.round(0.5 * (input.proj_mass / 1000) * roundedV50 * roundedV50);
+      points.push({
+        velocity: roundedV50,
+        Probability: Math.round(prob50 * 1000) / 10,
+        Energy: energy50
+      });
+      points.sort((a, b) => a.velocity - b.velocity);
+    }
+
     return points;
   }, [prediction, input.proj_mass]);
 
@@ -274,6 +403,21 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
   const kineticEnergyFtLbs = Math.round(kineticEnergyJ * 0.737562);
   const v50Fps = Math.round(v50Val * 3.28084);
   const v50Kmh = Math.round(v50Val * 3.6);
+
+  // Probe telemetry at testVelocity
+  const slope = 0.035;
+  const currentTestProb = useMemo(() => {
+    if (!v50Val) return 50;
+    const prob = 1 / (1 + Math.exp(-slope * (testVelocity - v50Val)));
+    return Math.round(prob * 1000) / 10;
+  }, [testVelocity, v50Val]);
+
+  const currentTestEnergy = useMemo(() => {
+    return Math.round(0.5 * (input.proj_mass / 1000) * testVelocity * testVelocity);
+  }, [testVelocity, input.proj_mass]);
+
+  const minCurveV = curveData.length > 0 ? curveData[0].velocity : Math.max(30, Math.round(v50Val - 250));
+  const maxCurveV = curveData.length > 0 ? curveData[curveData.length - 1].velocity : Math.round(v50Val + 250);
 
   return (
     <div className="space-y-8 pb-16 font-sans">
@@ -334,7 +478,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                   <FolderOpen className="w-3.5 h-3.5 text-purple-400" />
                   <span>Armor Configuration Preset:</span>
                 </label>
-                {selectedPresetId && !allPresets.find((p) => p.id === selectedPresetId)?.isBuiltIn && (
+                {selectedPresetId && !allPresets.find((p) => p.id === selectedPresetId)?.isBuiltIn && selectedPresetId !== 'custom-active' && (
                   <button
                     type="button"
                     onClick={() => handleDeletePreset(selectedPresetId)}
@@ -352,6 +496,11 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                 onChange={(e) => handleSelectPreset(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-purple-400"
               >
+                {selectedPresetId === 'custom-active' && (
+                  <option value="custom-active" disabled>
+                    ✏️ Custom Configuration (Modified)
+                  </option>
+                )}
                 <optgroup label="Standard Test Standards (MIL-STD-662F)">
                   {BUILT_IN_V50_PRESETS.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -385,7 +534,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                   <label className="block text-slate-400 mb-1">Projectile Type:</label>
                   <select
                     value={input.proj_type}
-                    onChange={(e) => setInput({ ...input, proj_type: e.target.value })}
+                    onChange={(e) => handleProjTypeChange(e.target.value)}
                     className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:border-purple-400"
                   >
                     <option value="AP">Armor Piercing (AP)</option>
@@ -399,7 +548,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                   <label className="block text-slate-400 mb-1">Target Material:</label>
                   <select
                     value={input.Material}
-                    onChange={(e) => setInput({ ...input, Material: e.target.value })}
+                    onChange={(e) => handleMaterialChange(e.target.value)}
                     className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:border-purple-400"
                   >
                     <option value="Steel">RHA Steel</option>
@@ -420,7 +569,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                     min="1"
                     max="100"
                     value={input.calibre}
-                    onChange={(e) => setInput({ ...input, calibre: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => updateField('calibre', parseFloat(e.target.value) || 0)}
                     className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:border-purple-400"
                     required
                   />
@@ -434,7 +583,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                     min="0.1"
                     max="1000"
                     value={input.proj_mass}
-                    onChange={(e) => setInput({ ...input, proj_mass: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => updateField('proj_mass', parseFloat(e.target.value) || 0)}
                     className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:border-purple-400"
                     required
                   />
@@ -451,7 +600,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                     min="0.5"
                     max="150"
                     value={input.thickness}
-                    onChange={(e) => setInput({ ...input, thickness: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => updateField('thickness', parseFloat(e.target.value) || 0)}
                     className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:border-purple-400"
                     required
                   />
@@ -465,7 +614,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                     min="0"
                     max="75"
                     value={input.angle}
-                    onChange={(e) => setInput({ ...input, angle: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => updateField('angle', parseFloat(e.target.value) || 0)}
                     className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:border-purple-400"
                     required
                   />
@@ -482,7 +631,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                     min="50"
                     max="3000"
                     value={input.yield}
-                    onChange={(e) => setInput({ ...input, yield: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => updateField('yield', parseFloat(e.target.value) || 0)}
                     className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:border-purple-400"
                     required
                   />
@@ -496,7 +645,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                     min="50"
                     max="3500"
                     value={input.UTS}
-                    onChange={(e) => setInput({ ...input, UTS: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => updateField('UTS', parseFloat(e.target.value) || 0)}
                     className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:border-purple-400"
                     required
                   />
@@ -513,7 +662,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                     min="1"
                     max="60"
                     value={input.elongation}
-                    onChange={(e) => setInput({ ...input, elongation: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => updateField('elongation', parseFloat(e.target.value) || 0)}
                     className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:border-purple-400"
                     required
                   />
@@ -527,7 +676,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                     min="50"
                     max="800"
                     value={input.hardness}
-                    onChange={(e) => setInput({ ...input, hardness: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => updateField('hardness', parseFloat(e.target.value) || 0)}
                     className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:border-purple-400"
                     required
                   />
@@ -704,7 +853,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                   <span>Perforation Probability vs Impact Velocity S-Curve</span>
                 </h3>
                 <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                  Sigmoidal transition curve centered at critical ballistic limit threshold V50.
+                  Sigmoidal transition curve centered at critical ballistic limit threshold V50 ({v50Val.toFixed(1)} m/s).
                 </p>
               </div>
 
@@ -718,18 +867,22 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
               </button>
             </div>
 
-            {/* S-Curve Area Chart */}
+            {/* S-Curve Area Chart with Key tied to prediction updates */}
             <div className="w-full h-80 sm:h-96">
               {curveData.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-slate-500 font-mono text-xs">
                   Awaiting model prediction calculation.
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={curveData} margin={{ top: 20, right: 30, left: 15, bottom: 25 }}>
+                <ResponsiveContainer width="100%" height="100%" key={`rc-${calcCount}`}>
+                  <AreaChart
+                    key={`v50-chart-${v50Val.toFixed(1)}-${calcCount}`}
+                    data={curveData}
+                    margin={{ top: 20, right: 30, left: 15, bottom: 25 }}
+                  >
                     <defs>
                       <linearGradient id="v50CurveGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#818cf8" stopOpacity={0.45} />
+                        <stop offset="5%" stopColor="#818cf8" stopOpacity={0.5} />
                         <stop offset="95%" stopColor="#c084fc" stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
@@ -737,7 +890,9 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
 
                     <XAxis
+                      type="number"
                       dataKey="velocity"
+                      domain={['dataMin', 'dataMax']}
                       stroke="#64748b"
                       tick={{ fontSize: 11, fill: '#94a3b8' }}
                       label={{
@@ -751,6 +906,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                     />
 
                     <YAxis
+                      type="number"
                       domain={[0, 100]}
                       stroke="#64748b"
                       tick={{ fontSize: 11, fill: '#94a3b8' }}
@@ -793,6 +949,8 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                       strokeWidth={2.5}
                       fillOpacity={1}
                       fill="url(#v50CurveGrad)"
+                      isAnimationActive={true}
+                      animationDuration={600}
                     />
 
                     {/* V50 50% Horizontal Reference Line */}
@@ -836,10 +994,115 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage }) => {
                         }}
                       />
                     )}
+
+                    {/* Interactive Test Velocity Probe Marker if different from V50 */}
+                    {testVelocity !== null && Math.abs(testVelocity - Math.round(v50Val)) > 3 && (
+                      <>
+                        <ReferenceLine
+                          x={testVelocity}
+                          stroke="#38bdf8"
+                          strokeDasharray="2 2"
+                        />
+                        <ReferenceDot
+                          x={testVelocity}
+                          y={currentTestProb}
+                          r={6}
+                          fill="#38bdf8"
+                          stroke="#ffffff"
+                          strokeWidth={1.5}
+                          label={{
+                            value: `${testVelocity} m/s (${currentTestProb}%)`,
+                            position: currentTestProb > 50 ? 'bottom' : 'top',
+                            fill: '#7dd3fc',
+                            fontSize: 10,
+                            fontFamily: 'monospace'
+                          }}
+                        />
+                      </>
+                    )}
                   </AreaChart>
                 </ResponsiveContainer>
               )}
             </div>
+
+            {/* Interactive Impact Velocity Simulation Probe */}
+            {v50Val > 0 && (
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3 font-mono">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Crosshair className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                      Interactive Impact Velocity Probe
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-400">Armor Outcome:</span>
+                    {currentTestProb < 30 ? (
+                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                        Deflection / Ricochet Dominates
+                      </span>
+                    ) : currentTestProb <= 70 ? (
+                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
+                        Critical V50 Transition Regime
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-bold">
+                        Target Perforation Complete
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                  <div className="sm:col-span-7 flex items-center gap-3">
+                    <label className="text-[11px] text-slate-400 shrink-0">
+                      Test Velocity:
+                    </label>
+                    <input
+                      type="range"
+                      min={minCurveV}
+                      max={maxCurveV}
+                      step={1}
+                      value={testVelocity}
+                      onChange={(e) => setTestVelocity(parseInt(e.target.value) || minCurveV)}
+                      className="w-full accent-cyan-400 h-1.5 bg-slate-700 rounded-lg cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-5 flex items-center justify-end gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-xs">
+                      <input
+                        type="number"
+                        min={minCurveV}
+                        max={maxCurveV}
+                        value={testVelocity}
+                        onChange={(e) => setTestVelocity(parseInt(e.target.value) || minCurveV)}
+                        className="w-16 bg-transparent text-cyan-300 font-bold focus:outline-none text-right font-mono"
+                      />
+                      <span className="text-slate-500 text-[10px]">m/s</span>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-[10px]">
+                      <span className="px-2 py-1 rounded bg-purple-500/10 text-purple-300 border border-purple-500/30 font-bold">
+                        {currentTestProb}% Prob
+                      </span>
+                      <span className="px-2 py-1 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
+                        {currentTestEnergy.toLocaleString()} J
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setTestVelocity(Math.round(v50Val))}
+                      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] border border-slate-700 cursor-pointer transition-colors"
+                      title="Snap probe back to exact V50 threshold"
+                    >
+                      Reset V50
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Educational Standards & Methodology Note */}
             <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] font-mono text-slate-400 flex items-start gap-2.5">
