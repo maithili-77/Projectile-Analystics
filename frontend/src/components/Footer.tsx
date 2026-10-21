@@ -8,7 +8,7 @@ export const Footer: React.FC = () => {
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-400">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-cyan-400" />
-            <span>Academic ML Research Platform &bull; Ballistic Analytics & Simulation</span>
+            <span>Academic ML Research Platform &bull; Ballastix Analytics & Simulation</span>
           </div>
 
           <div className="flex items-center gap-6 font-mono text-[11px] text-slate-500">

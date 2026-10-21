@@ -58,7 +58,7 @@ export const Navbar: React.FC<Props> = ({ activeTab, setActiveTab, health, loadi
             </div>
             <div>
               <div className="text-sm font-bold tracking-wider text-slate-100 uppercase flex items-center gap-2">
-                <span>BALLISTIC ANALYTICS</span>
+                <span>BALLASTIX</span>
                 <span className="px-1.5 py-0.5 text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded font-mono">
                   v2.0 ML
                 </span>

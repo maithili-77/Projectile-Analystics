@@ -47,6 +47,7 @@ interface PerformanceProps {
   bc?: number;
   onFire?: () => void;
   loading?: boolean;
+  runTrigger?: number;
 }
 
 export const PerformanceVisualizer: React.FC<PerformanceProps> = ({
@@ -63,7 +64,8 @@ export const PerformanceVisualizer: React.FC<PerformanceProps> = ({
   weightGrains = 150,
   bc = 0.45,
   onFire,
-  loading = false
+  loading = false,
+  runTrigger = 0
 }) => {
   // Realistic Fallbacks if ML predictions are pending or zero
   const safeV0 = v0 > 0 ? v0 : 2800;
@@ -82,7 +84,7 @@ export const PerformanceVisualizer: React.FC<PerformanceProps> = ({
   const [animationMode, setAnimationMode] = useState<'all' | 'velocity' | 'energy' | 'drop'>('all');
   const [graphsLayout, setGraphsLayout] = useState<'grid' | 'velocity' | 'energy' | 'drop'>('grid');
   const [progress, setProgress] = useState<number>(0); // 0 to 200 yards
-  const [isPlaying, setIsPlaying] = useState<boolean>(true);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [speed, setSpeed] = useState<number>(1);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [muzzleFlashActive, setMuzzleFlashActive] = useState<boolean>(false);
@@ -237,19 +239,32 @@ export const PerformanceVisualizer: React.FC<PerformanceProps> = ({
     setTimeout(() => {
       setMuzzleFlashActive(false);
     }, 180);
+  }, [playSound]);
 
+  const handleManualFire = useCallback(() => {
+    triggerFire();
     if (onFire) {
       onFire();
     }
-  }, [playSound, onFire]);
+  }, [triggerFire, onFire]);
 
-  // Reset when input values change
+  // Run animation only when model is triggered by user
+  useEffect(() => {
+    if (runTrigger && runTrigger > 0) {
+      triggerFire();
+    }
+  }, [runTrigger, triggerFire]);
+
+  // Reset to stable resting position when input values change
   useEffect(() => {
     setProgress(0);
-    setIsPlaying(true);
+    setIsPlaying(false);
     hasTriggered100Sfx.current = false;
     hasTriggered200Sfx.current = false;
-  }, [v0, v100, v200, e100, e200, bd100, bd200]);
+    setTarget1HitActive(false);
+    setTarget2HitActive(false);
+    setMuzzleFlashActive(false);
+  }, [v0, v100, v200, e100, e200, bd100, bd200, cartridgeName, firearmType, weightGrains, bc]);
 
   // --- Animation Frame Loop ---
   useEffect(() => {
@@ -282,12 +297,8 @@ export const PerformanceVisualizer: React.FC<PerformanceProps> = ({
             playSound('gong');
             setTimeout(() => setTarget2HitActive(false), 500);
           }
-          // Loop back smoothly with a brief terminal pause
-          setTimeout(() => {
-            setProgress(0);
-            hasTriggered100Sfx.current = false;
-            hasTriggered200Sfx.current = false;
-          }, 600);
+          // Complete shot and stay stable at 200 yards (do NOT loop continuously)
+          setIsPlaying(false);
           return 200;
         }
 
@@ -772,6 +783,25 @@ export const PerformanceVisualizer: React.FC<PerformanceProps> = ({
 
           {/* Tactical Badges & Audio SFX Control */}
           <div className="flex items-center gap-2 flex-wrap">
+            {!isPlaying && progress === 0 && (
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5 font-mono">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                <span>STABLE • READY</span>
+              </span>
+            )}
+            {isPlaying && (
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5 animate-pulse font-mono">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+                <span>IN-FLIGHT ({Math.round(progress)}y)</span>
+              </span>
+            )}
+            {!isPlaying && progress >= 200 && (
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 font-mono">
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                <span>STAGE 2 COMPLETE (200y)</span>
+              </span>
+            )}
+
             <button
               type="button"
               onClick={() => setSoundEnabled(!soundEnabled)}
@@ -816,7 +846,7 @@ export const PerformanceVisualizer: React.FC<PerformanceProps> = ({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={triggerFire}
+                onClick={handleManualFire}
                 disabled={loading}
                 className="h-9 px-4 rounded-xl bg-gradient-to-r from-red-600 via-amber-600 to-amber-500 hover:from-red-500 hover:to-amber-400 active:scale-95 text-white font-extrabold text-xs shadow-lg shadow-amber-900/30 border border-amber-400/40 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
@@ -835,9 +865,16 @@ export const PerformanceVisualizer: React.FC<PerformanceProps> = ({
 
               <button
                 type="button"
-                onClick={triggerFire}
+                onClick={() => {
+                  setProgress(0);
+                  setIsPlaying(false);
+                  hasTriggered100Sfx.current = false;
+                  hasTriggered200Sfx.current = false;
+                  setTarget1HitActive(false);
+                  setTarget2HitActive(false);
+                }}
                 className="h-9 w-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 text-xs font-mono flex items-center justify-center transition-all cursor-pointer"
-                title="Reset and Replay"
+                title="Reset to Muzzle"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>

@@ -1,4 +1,4 @@
-# Advanced Ballistic Analytics and Simulation Platform
+# Ballastix - Advanced Ballistic Analytics and Simulation Platform
 ## Academic Research Report & Machine Learning Evaluation
 
 **Authors**: Machine Learning Research & Ballistic Physics Computation Group  

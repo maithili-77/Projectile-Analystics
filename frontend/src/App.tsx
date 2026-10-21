@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { Sidebar, PageId } from './components/Sidebar';
 import { Footer } from './components/Footer';
 import { HomePage } from './pages/HomePage';
@@ -6,6 +7,7 @@ import { CalculatorPage } from './pages/CalculatorPage';
 import { SimulatorPage } from './pages/SimulatorPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { AboutPage } from './pages/AboutPage';
+import { IntroAnimation } from './components/IntroAnimation';
 import { api } from './services/api';
 import { HealthStatus } from './types';
 
@@ -15,6 +17,13 @@ export const App: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [isOpenMobile, setIsOpenMobile] = useState<boolean>(false);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+  const [showIntro, setShowIntro] = useState<boolean>(() => {
+    try {
+      return !sessionStorage.getItem('ballistix_intro_seen');
+    } catch {
+      return true;
+    }
+  });
 
   useEffect(() => {
     api.getHealth()
@@ -24,33 +33,42 @@ export const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:flex-row selection:bg-cyan-500 selection:text-slate-950">
-      {/* Sidebar Navigation */}
-      <Sidebar
-        activePage={activePage}
-        setActivePage={setActivePage}
-        health={health}
-        loading={loading}
-        isOpenMobile={isOpenMobile}
-        setIsOpenMobile={setIsOpenMobile}
-        isCollapsed={isCollapsed}
-        setIsCollapsed={setIsCollapsed}
-      />
+    <>
+      <AnimatePresence>
+        {showIntro && (
+          <IntroAnimation onComplete={() => setShowIntro(false)} />
+        )}
+      </AnimatePresence>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col justify-between min-w-0 overflow-x-hidden">
-        <main className="p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          {activePage === 'home' && <HomePage setActivePage={setActivePage} health={health} />}
-          {activePage === 'calculator' && <CalculatorPage setActivePage={setActivePage} />}
-          {activePage === 'simulator' && <SimulatorPage />}
-          {activePage === 'history' && <HistoryPage />}
-          {activePage === 'about' && <AboutPage />}
-        </main>
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:flex-row selection:bg-cyan-500 selection:text-slate-950">
+        {/* Sidebar Navigation */}
+        <Sidebar
+          activePage={activePage}
+          setActivePage={setActivePage}
+          health={health}
+          loading={loading}
+          isOpenMobile={isOpenMobile}
+          setIsOpenMobile={setIsOpenMobile}
+          isCollapsed={isCollapsed}
+          setIsCollapsed={setIsCollapsed}
+        />
 
-        <Footer />
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col justify-between min-w-0 overflow-x-hidden">
+          <main className="p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+            {activePage === 'home' && <HomePage setActivePage={setActivePage} health={health} />}
+            {activePage === 'calculator' && <CalculatorPage setActivePage={setActivePage} />}
+            {activePage === 'simulator' && <SimulatorPage />}
+            {activePage === 'history' && <HistoryPage />}
+            {activePage === 'about' && <AboutPage />}
+          </main>
+
+          <Footer />
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
 export default App;
+

@@ -1,4 +1,4 @@
-# Advanced Ballistic Analytics and Simulation Platform
+# Ballastix - Advanced Ballistic Analytics and Simulation Platform
 ## System Architecture & Technical Specification
 
 > [!IMPORTANT]

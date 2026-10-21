@@ -15,9 +15,7 @@ import {
   Database,
   ShieldCheck,
   Zap,
-  Info,
-  BarChart2,
-  BookOpen
+  Info
 } from 'lucide-react';
 import { AcademicDisclaimer } from '../components/AcademicDisclaimer';
 import { TrajectoryCanvas2D } from '../simulator/TrajectoryCanvas2D';
@@ -26,7 +24,6 @@ import { PerformanceVisualizer } from '../simulator/PerformanceVisualizer';
 import { V50Visualizer } from '../simulator/V50Visualizer';
 import { ReferenceComparisonChart } from '../simulator/ReferenceComparisonChart';
 import { WhatIfAnalysis } from '../simulator/WhatIfAnalysis';
-import { ModelExplanation } from '../simulator/ModelExplanation';
 import { api } from '../services/api';
 import {
   TrajectoryInput,
@@ -83,6 +80,11 @@ export const SimulatorPage: React.FC = () => {
 
   // Trajectory Canvas View toggle (2D / 3D)
   const [activeView, setActiveView] = useState<'2d' | '3d'>('2d');
+
+  // Explicit user trigger timestamp for V50 animation (stable at 0 until user runs model)
+  const [v50RunTrigger, setV50RunTrigger] = useState<number>(0);
+  // Explicit user trigger timestamp for Velocity animation (stable at 0 until user runs model)
+  const [perfRunTrigger, setPerfRunTrigger] = useState<number>(0);
 
   // Primary Predict Handler
   const handlePredict = async () => {
@@ -170,6 +172,21 @@ export const SimulatorPage: React.FC = () => {
     if (predictionStatus === 'NEWLY PREDICTED') {
       setPredictionStatus('PREVIOUS PREDICTION');
     }
+    if (selectedDataset === 'v50') {
+      setV50RunTrigger(0);
+    } else if (selectedDataset === 'performance') {
+      setPerfRunTrigger(0);
+    }
+  };
+
+  // User-initiated model run (activates V50 / Velocity animation on demand)
+  const handleUserRunModel = () => {
+    if (selectedDataset === 'v50') {
+      setV50RunTrigger(Date.now());
+    } else if (selectedDataset === 'performance') {
+      setPerfRunTrigger(Date.now());
+    }
+    handlePredict();
   };
 
   const domainScorePct = prediction ? Math.round(prediction.domain_score * 100) : 100;
@@ -563,7 +580,7 @@ export const SimulatorPage: React.FC = () => {
 
               <button
                 type="button"
-                onClick={handlePredict}
+                onClick={handleUserRunModel}
                 disabled={loading}
                 className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 disabled:opacity-50 text-white text-xs font-bold shadow-glow-cyan flex items-center justify-center gap-2 transition-all cursor-pointer font-sans uppercase tracking-wider"
               >
@@ -650,8 +667,9 @@ export const SimulatorPage: React.FC = () => {
               firearmType={perfType}
               weightGrains={perfWeight}
               bc={perfBC}
-              onFire={handlePredict}
+              onFire={handleUserRunModel}
               loading={loading}
+              runTrigger={perfRunTrigger}
             />
           ) : (
             <V50Visualizer
@@ -664,6 +682,9 @@ export const SimulatorPage: React.FC = () => {
               yieldStrength={v50Yield}
               hardness={v50Hardness}
               density={v50Density}
+              runTrigger={v50RunTrigger}
+              onFire={handleUserRunModel}
+              loading={loading}
             />
           )}
         </div>
@@ -772,74 +793,6 @@ export const SimulatorPage: React.FC = () => {
         <div id="performance-graphs-slot" className="w-full"></div>
       )}
 
-      {/* REQUIREMENT 6: RESEARCH INSIGHTS AND MODEL COMPARISON SECTION (Hidden in Predict Range and Max Height) */}
-      {selectedDataset !== 'trajectory' && (
-        <div className="space-y-6 pt-6 border-t border-slate-800">
-          <div className="flex items-center gap-2 font-mono">
-            <BookOpen className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-base font-bold text-slate-100 uppercase tracking-wider font-sans">
-              RESEARCH INSIGHTS AND MODEL COMPARISON
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono text-xs">
-            {/* Card 1: Domain Coverage & Bounds Validation */}
-            <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-3">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-sans flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Training Domain Bounds Validation</span>
-              </h3>
-              <p className="text-slate-300 text-[11px] leading-relaxed font-sans">
-                Evaluates if user-selected input features lie strictly within the experimental range of the training dataset ({
-                  selectedDataset === 'performance' ? 'ballistics_500.csv' : 'REL_v50_database.csv'
-                }).
-              </p>
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
-                <span className="text-slate-400">Coverage Score:</span>
-                <span className="text-cyan-300 font-bold">{domainScorePct}% In-Domain</span>
-              </div>
-            </div>
-
-            {/* Card 2: Offline Model Benchmark Metrics */}
-            <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-3">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-sans flex items-center gap-2">
-                <BarChart2 className="w-4 h-4 text-cyan-400" />
-                <span>Offline Model Evaluation Metrics</span>
-              </h3>
-              <div className="space-y-2 text-[11px]">
-                <div className="flex justify-between p-2 rounded bg-slate-900 border border-slate-800">
-                  <span className="text-slate-400">R² Coefficient of Determination:</span>
-                  <span className="text-emerald-300 font-bold">{prediction?.metrics?.R2 ?? '0.96+'}</span>
-                </div>
-                <div className="flex justify-between p-2 rounded bg-slate-900 border border-slate-800">
-                  <span className="text-slate-400">Root Mean Squared Error (RMSE):</span>
-                  <span className="text-slate-200 font-bold">{prediction?.metrics?.RMSE ?? '34.2'}</span>
-                </div>
-                <div className="flex justify-between p-2 rounded bg-slate-900 border border-slate-800">
-                  <span className="text-slate-400">Mean Absolute Error (MAE):</span>
-                  <span className="text-slate-200 font-bold">{prediction?.metrics?.MAE ?? '22.1'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Card 3: Academic Limitations & Non-Operational Disclaimer */}
-            <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-3">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-sans flex items-center gap-2">
-                <Info className="w-4 h-4 text-purple-400" />
-                <span>Academic Model Limitations</span>
-              </h3>
-              <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
-                Machine learning models generate statistical estimations based on recorded training distributions. Predictions should be evaluated alongside reference physics calculations and do not replace validated laboratory or range testing.
-              </p>
-            </div>
-          </div>
-
-          {/* Feature Importance Panel (If available) */}
-          {prediction?.feature_importances && (
-            <ModelExplanation featureImportances={prediction.feature_importances} />
-          )}
-        </div>
-      )}
 
     </div>
   );
