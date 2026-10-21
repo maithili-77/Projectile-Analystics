@@ -204,8 +204,13 @@ export interface AnalyticsInsights {
 }
 
 export interface PredictionHistoryItem {
+  id?: string;
   type: string;
   timestamp: string;
+  model_name?: string;
+  domain_score?: number;
+  domain_coverage_explanation?: string;
+  source_page?: string;
   input: Record<string, any>;
   output: Record<string, any>;
 }

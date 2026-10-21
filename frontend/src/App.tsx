@@ -59,7 +59,7 @@ export const App: React.FC = () => {
             {activePage === 'home' && <HomePage setActivePage={setActivePage} health={health} />}
             {activePage === 'calculator' && <CalculatorPage setActivePage={setActivePage} />}
             {activePage === 'simulator' && <SimulatorPage />}
-            {activePage === 'history' && <HistoryPage />}
+            {activePage === 'history' && <HistoryPage setActivePage={setActivePage} />}
             {activePage === 'about' && <AboutPage />}
           </main>
 

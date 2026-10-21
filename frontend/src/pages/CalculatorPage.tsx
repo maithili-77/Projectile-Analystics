@@ -32,6 +32,7 @@ import { AcademicDisclaimer } from '../components/AcademicDisclaimer';
 import { PageId } from '../components/Sidebar';
 import { api } from '../services/api';
 import { V50Input, PredictionResult } from '../types';
+import { savePredictionToHistory } from '../utils/history';
 
 interface Props {
   setActivePage?: (page: PageId) => void;
@@ -251,6 +252,18 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage 
       const predictedV50 = res.prediction?.v50;
       if (typeof predictedV50 === 'number' && predictedV50 > 0) {
         setTestVelocity(Math.round(predictedV50));
+      }
+
+      if (res) {
+        savePredictionToHistory({
+          type: 'V50',
+          model_name: res.model_name,
+          domain_score: res.domain_score,
+          domain_coverage_explanation: res.domain_coverage_explanation,
+          source_page: 'V50 Ballistic Calculator',
+          input: { ...targetInput },
+          output: res.prediction
+        });
       }
     } catch (err: any) {
       console.error('V50 prediction error:', err);

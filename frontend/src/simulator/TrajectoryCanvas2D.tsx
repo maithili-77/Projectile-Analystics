@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Play,
   Pause,
@@ -7,14 +7,13 @@ import {
   VolumeX,
   Crosshair,
   Flame,
-  Camera,
   Layers,
-  Sparkles
+  Repeat
 } from 'lucide-react';
 import { TrajectoryPoint } from '../types';
 
 interface Props {
-  points: TrajectoryPoint[];
+  points?: TrajectoryPoint[];
   maxRange: number;
   maxHeight: number;
   velocity?: number;
@@ -24,9 +23,9 @@ interface Props {
   predictedHeight?: number;
   onFire?: () => void;
   loading?: boolean;
+  runTrigger?: number;
 }
 
-// Particle interface for smoke, sparks, and impact debris
 interface Particle {
   x: number;
   y: number;
@@ -40,14 +39,6 @@ interface Particle {
   life: number;
 }
 
-// Impact explosion state
-interface ImpactEvent {
-  x: number;
-  y: number;
-  active: boolean;
-  time: number;
-}
-
 export const TrajectoryCanvas2D: React.FC<Props> = ({
   points,
   maxRange,
@@ -59,27 +50,47 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
   predictedHeight,
   onFire,
   loading = false,
+  runTrigger = 0
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Animation playback state
-  const [currentProgress, setCurrentProgress] = useState<number>(0); // 0 to 1
-  const [isPlaying, setIsPlaying] = useState<boolean>(true);
+  // High-performance animation refs (Zero React re-render overhead during 60 FPS flight)
+  const progressRef = useRef<number>(0); // 0 to 1
+  const isPlayingRef = useRef<boolean>(false);
+  const playbackSpeedRef = useRef<number>(1);
+  const loopEnabledRef = useRef<boolean>(false);
+  const soundEnabledRef = useRef<boolean>(true);
+  const showTrajectoryArcRef = useRef<boolean>(true);
+  const prevRunTriggerRef = useRef<number>(0);
+
+  // UI state for button visual active states only
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
-  const [cameraMode, setCameraMode] = useState<'overview' | 'follow'>('overview');
   const [showTrajectoryArc, setShowTrajectoryArc] = useState<boolean>(true);
+  const [loopEnabled, setLoopEnabled] = useState<boolean>(false);
 
-  // Recoil & blast state
-  const recoilRef = useRef<number>(0); // 0 (idle) to 1 (full kick)
-  const muzzleFlashRef = useRef<number>(0); // 0 (none) to 1 (full flash)
+  // Direct DOM refs for 60fps lag-free telemetry updates without React re-renders
+  const liveSpeedDomRef = useRef<HTMLElement | null>(null);
+  const liveAltDomRef = useRef<HTMLDivElement | null>(null);
+  const liveDownrangeDomRef = useRef<HTMLDivElement | null>(null);
+
+  // FX state refs
+  const recoilRef = useRef<number>(0);
+  const muzzleFlashRef = useRef<number>(0);
   const particlesRef = useRef<Particle[]>([]);
-  const impactRef = useRef<ImpactEvent | null>(null);
   const hasTriggeredImpactRef = useRef<boolean>(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const prevPointsRef = useRef<TrajectoryPoint[]>(points);
+  const loopTimeoutRef = useRef<number | null>(null);
 
-  // Sound Synthesizer via Web Audio API (zero external assets needed)
+  // Sync state changes to refs for instant, lag-free closure access
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+  useEffect(() => { playbackSpeedRef.current = playbackSpeed; }, [playbackSpeed]);
+  useEffect(() => { soundEnabledRef.current = soundEnabled; }, [soundEnabled]);
+  useEffect(() => { showTrajectoryArcRef.current = showTrajectoryArc; }, [showTrajectoryArc]);
+  useEffect(() => { loopEnabledRef.current = loopEnabled; }, [loopEnabled]);
+
+  // Web Audio Synthesizer (Zero asset loading lag)
   const initAudio = () => {
     if (!audioCtxRef.current) {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -94,285 +105,249 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
   };
 
   const playGunshotSound = useCallback(() => {
-    if (!soundEnabled) return;
+    if (!soundEnabledRef.current) return;
     try {
       const ctx = initAudio();
       if (!ctx) return;
       const now = ctx.currentTime;
 
-      // 1. Sharp mechanical crack & muzzle blast noise
-      const bufferSize = ctx.sampleRate * 0.2;
+      const bufferSize = Math.floor(ctx.sampleRate * 0.18);
       const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const output = noiseBuffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
-        output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.04));
+        output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.035));
       }
       const whiteNoise = ctx.createBufferSource();
       whiteNoise.buffer = noiseBuffer;
 
       const noiseFilter = ctx.createBiquadFilter();
       noiseFilter.type = 'bandpass';
-      noiseFilter.frequency.setValueAtTime(1400, now);
+      noiseFilter.frequency.setValueAtTime(1300, now);
       noiseFilter.Q.setValueAtTime(1.8, now);
 
       const noiseGain = ctx.createGain();
-      noiseGain.gain.setValueAtTime(1.0, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      noiseGain.gain.setValueAtTime(0.75, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
 
       whiteNoise.connect(noiseFilter);
       noiseFilter.connect(noiseGain);
       noiseGain.connect(ctx.destination);
       whiteNoise.start(now);
 
-      // 2. Heavy sub-bass boom (80Hz dropping to 30Hz)
       const bassOsc = ctx.createOscillator();
       const bassGain = ctx.createGain();
       bassOsc.type = 'triangle';
-      bassOsc.frequency.setValueAtTime(110, now);
-      bassOsc.frequency.exponentialRampToValueAtTime(32, now + 0.35);
+      bassOsc.frequency.setValueAtTime(115, now);
+      bassOsc.frequency.exponentialRampToValueAtTime(34, now + 0.32);
 
-      bassGain.gain.setValueAtTime(0.9, now);
-      bassGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+      bassGain.gain.setValueAtTime(0.65, now);
+      bassGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
 
       bassOsc.connect(bassGain);
       bassGain.connect(ctx.destination);
       bassOsc.start(now);
-      bassOsc.stop(now + 0.4);
-
-      // 3. Outdoor atmospheric echo / low rumbling tail
-      const tailOsc = ctx.createOscillator();
-      const tailGain = ctx.createGain();
-      tailOsc.type = 'sine';
-      tailOsc.frequency.setValueAtTime(55, now);
-      tailOsc.frequency.exponentialRampToValueAtTime(20, now + 0.6);
-
-      tailGain.gain.setValueAtTime(0.5, now + 0.05);
-      tailGain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
-
-      tailOsc.connect(tailGain);
-      tailGain.connect(ctx.destination);
-      tailOsc.start(now);
-      tailOsc.stop(now + 0.7);
-    } catch (e) {
-      console.warn('Audio synthesis notice:', e);
+      bassOsc.stop(now + 0.36);
+    } catch {
+      // Audio fallback
     }
-  }, [soundEnabled]);
+  }, []);
 
   const playImpactSound = useCallback(() => {
-    if (!soundEnabled) return;
+    if (!soundEnabledRef.current) return;
     try {
       const ctx = initAudio();
       if (!ctx) return;
       const now = ctx.currentTime;
 
-      // Heavy metal / dirt impact thud
       const impOsc = ctx.createOscillator();
       const impGain = ctx.createGain();
       impOsc.type = 'sawtooth';
-      impOsc.frequency.setValueAtTime(160, now);
-      impOsc.frequency.exponentialRampToValueAtTime(40, now + 0.14);
+      impOsc.frequency.setValueAtTime(170, now);
+      impOsc.frequency.exponentialRampToValueAtTime(45, now + 0.14);
 
-      impGain.gain.setValueAtTime(0.8, now);
-      impGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      impGain.gain.setValueAtTime(0.65, now);
+      impGain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
 
       impOsc.connect(impGain);
       impGain.connect(ctx.destination);
       impOsc.start(now);
-      impOsc.stop(now + 0.2);
-
-      // Impact crunch noise
-      const bufferSize = ctx.sampleRate * 0.1;
-      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const output = noiseBuffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.025));
-      }
-      const noiseSource = ctx.createBufferSource();
-      noiseSource.buffer = noiseBuffer;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(800, now);
-
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.6, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-
-      noiseSource.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
-      noiseSource.start(now);
-    } catch (e) {
-      console.warn('Audio synthesis notice:', e);
+      impOsc.stop(now + 0.18);
+    } catch {
+      // Audio fallback
     }
-  }, [soundEnabled]);
-
-  // Compute fallback trajectory points if backend simulation points are not yet populated
-  const effectivePoints = React.useMemo(() => {
-    if (points && points.length > 1) {
-      return points;
-    }
-    // High-precision kinematic fallback trajectory
-    const v0 = velocity;
-    const rad = (angleDeg * Math.PI) / 180;
-    const g = gravity;
-    const totalTime = (2 * v0 * Math.sin(rad)) / g;
-    const count = 100;
-    const pts: TrajectoryPoint[] = [];
-    const maxT = Math.max(0.1, totalTime);
-    for (let i = 0; i <= count; i++) {
-      const t = (i / count) * maxT;
-      const x = v0 * Math.cos(rad) * t;
-      const y = Math.max(0, v0 * Math.sin(rad) * t - 0.5 * g * t * t);
-      const vx = v0 * Math.cos(rad);
-      const vy = v0 * Math.sin(rad) - g * t;
-      pts.push({
-        t: Math.round(t * 100) / 100,
-        x: Math.round(x * 10) / 10,
-        y: Math.round(y * 10) / 10,
-        vx: Math.round(vx * 10) / 10,
-        vy: Math.round(vy * 10) / 10,
-        v: Math.round(Math.sqrt(vx * vx + vy * vy) * 10) / 10
-      });
-    }
-    return pts;
-  }, [points, velocity, angleDeg, gravity]);
+  }, []);
 
   // Trigger firing action
   const triggerFire = useCallback(() => {
-    setCurrentProgress(0);
+    if (loopTimeoutRef.current) {
+      clearTimeout(loopTimeoutRef.current);
+      loopTimeoutRef.current = null;
+    }
+    progressRef.current = 0;
+    isPlayingRef.current = true;
     setIsPlaying(true);
     recoilRef.current = 1.0;
     muzzleFlashRef.current = 1.0;
     hasTriggeredImpactRef.current = false;
-    impactRef.current = null;
     particlesRef.current = [];
 
-    // Spawn initial muzzle blast smoke particles
     const rad = (angleDeg * Math.PI) / 180;
-    const muzzleX = 65 * Math.cos(rad);
-    const muzzleY = 65 * Math.sin(rad);
-
-    for (let i = 0; i < 24; i++) {
-      const spread = (Math.random() - 0.5) * 0.8;
+    for (let i = 0; i < 28; i++) {
+      const spread = (Math.random() - 0.5) * 0.75;
       const pAngle = rad + spread;
-      const speed = 20 + Math.random() * 45;
+      const speed = 35 + Math.random() * 55;
       particlesRef.current.push({
-        x: muzzleX,
-        y: muzzleY,
+        x: 0,
+        y: 0,
         vx: Math.cos(pAngle) * speed,
         vy: -Math.sin(pAngle) * speed + (Math.random() - 0.5) * 10,
-        size: 4 + Math.random() * 8,
-        color: Math.random() > 0.4 ? '#f59e0b' : '#94a3b8',
-        alpha: 0.9,
+        size: 3 + Math.random() * 6,
+        color: Math.random() > 0.35 ? '#f59e0b' : '#38bdf8',
+        alpha: 0.95,
         decay: 0.025 + Math.random() * 0.035,
-        gravity: -2,
+        gravity: 4,
         life: 0
       });
     }
 
     playGunshotSound();
-    if (onFire) {
-      onFire();
-    }
-  }, [angleDeg, onFire, playGunshotSound]);
+  }, [angleDeg, playGunshotSound]);
 
-  // When input parameters or points change, trigger shot
+  // STABLE STANDBY MODE: When user adjusts sliders (velocity, angle, gravity),
+  // reset to stable standby with gun elevated at the set angle and bullet loaded.
+  // DO NOT AUTO-FIRE OR LOOP!
   useEffect(() => {
-    if (points !== prevPointsRef.current) {
-      prevPointsRef.current = points;
-      triggerFire();
+    if (loopTimeoutRef.current) {
+      clearTimeout(loopTimeoutRef.current);
+      loopTimeoutRef.current = null;
     }
-  }, [points, triggerFire]);
+    progressRef.current = 0;
+    isPlayingRef.current = false;
+    setIsPlaying(false);
+    recoilRef.current = 0;
+    muzzleFlashRef.current = 0;
+    hasTriggeredImpactRef.current = false;
+    particlesRef.current = [];
 
-  // Animation frame loop
+    if (liveDownrangeDomRef.current) liveDownrangeDomRef.current.textContent = '0 m';
+    if (liveAltDomRef.current) liveAltDomRef.current.textContent = '0 m';
+    if (liveSpeedDomRef.current) liveSpeedDomRef.current.textContent = `${Math.round(velocity)} m/s (Mach ${(velocity / 343).toFixed(1)})`;
+  }, [velocity, angleDeg, gravity]);
+
+  // USER RUN TRIGGER: Fires ONLY when user explicitly runs the model or clicks fire
+  useEffect(() => {
+    if (runTrigger && runTrigger > 0 && runTrigger !== prevRunTriggerRef.current) {
+      prevRunTriggerRef.current = runTrigger;
+      triggerFire();
+    } else if (runTrigger === 0) {
+      prevRunTriggerRef.current = 0;
+      if (loopTimeoutRef.current) {
+        clearTimeout(loopTimeoutRef.current);
+        loopTimeoutRef.current = null;
+      }
+      progressRef.current = 0;
+      isPlayingRef.current = false;
+      setIsPlaying(false);
+      recoilRef.current = 0;
+      muzzleFlashRef.current = 0;
+      hasTriggeredImpactRef.current = false;
+    }
+  }, [runTrigger, triggerFire]);
+
+  // Butter-smooth 60fps animation frame loop (Zero React re-render lag)
   useEffect(() => {
     let animId: number;
     let lastTime = performance.now();
 
     const animate = (time: number) => {
-      const dt = Math.min((time - lastTime) / 1000, 0.1);
+      const dt = Math.min((time - lastTime) / 1000, 0.08);
       lastTime = time;
 
-      // Update gun recoil recovery (damped spring return)
       if (recoilRef.current > 0) {
         recoilRef.current = Math.max(0, recoilRef.current - dt * 4.5);
       }
 
-      // Update muzzle flash fadeout
       if (muzzleFlashRef.current > 0) {
         muzzleFlashRef.current = Math.max(0, muzzleFlashRef.current - dt * 6.0);
       }
 
-      // Update particles
-      particlesRef.current = particlesRef.current
-        .map((p) => ({
-          ...p,
-          x: p.x + p.vx * dt,
-          y: p.y + p.vy * dt,
-          vy: p.vy + p.gravity * dt,
-          alpha: p.alpha - p.decay * (dt * 30),
-          size: p.size + dt * 4,
-          life: p.life + dt
-        }))
-        .filter((p) => p.alpha > 0.02);
-
-      // Update flight progress
-      if (isPlaying && effectivePoints.length > 1) {
-        // Total flight duration represented
-        const totalDuration = effectivePoints[effectivePoints.length - 1].t || 5.0;
-        const normalizedSpeed = (1.0 / Math.max(1.5, Math.min(6.0, totalDuration * 0.8))) * playbackSpeed;
-
-        setCurrentProgress((prev) => {
-          const next = prev + dt * normalizedSpeed;
-          if (next >= 1.0) {
-            // Trigger target impact once
-            if (!hasTriggeredImpactRef.current) {
-              hasTriggeredImpactRef.current = true;
-              playImpactSound();
-
-              // Spawn target impact explosion particles
-              const lastPt = effectivePoints[effectivePoints.length - 1];
-              impactRef.current = {
-                x: lastPt.x,
-                y: lastPt.y,
-                active: true,
-                time: performance.now()
-              };
-
-              for (let i = 0; i < 35; i++) {
-                const angle = Math.random() * Math.PI; // Upward hemisphere
-                const speed = 15 + Math.random() * 55;
-                particlesRef.current.push({
-                  x: 0, // relative to impact target center
-                  y: 0,
-                  vx: Math.cos(angle) * speed * (Math.random() > 0.5 ? 1 : -1),
-                  vy: -Math.sin(angle) * speed,
-                  size: 2 + Math.random() * 5,
-                  color: ['#ef4444', '#f59e0b', '#fbbf24', '#e2e8f0', '#78350f'][Math.floor(Math.random() * 5)],
-                  alpha: 1.0,
-                  decay: 0.03 + Math.random() * 0.04,
-                  gravity: 95,
-                  life: 0
-                });
-              }
-            }
-            setIsPlaying(false);
-            return 1.0;
-          }
-          return next;
-        });
+      // In-place particle updates (No GC churn)
+      const pArr = particlesRef.current;
+      for (let i = pArr.length - 1; i >= 0; i--) {
+        const p = pArr[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += p.gravity * dt;
+        p.alpha -= p.decay * (dt * 30);
+        p.size += dt * 3;
+        p.life += dt;
+        if (p.alpha <= 0.02) {
+          pArr.splice(i, 1);
+        }
       }
 
-      // Draw canvas frame
+      // Advance bullet progress ONLY when isPlayingRef is active
+      if (isPlayingRef.current) {
+        const flightDuration = 3.8;
+        const normalizedSpeed = (1.0 / flightDuration) * playbackSpeedRef.current;
+
+        progressRef.current += dt * normalizedSpeed;
+
+        if (progressRef.current >= 1.0) {
+          progressRef.current = 1.0;
+
+          if (!hasTriggeredImpactRef.current) {
+            hasTriggeredImpactRef.current = true;
+            playImpactSound();
+
+            for (let i = 0; i < 35; i++) {
+              const angle = Math.random() * Math.PI;
+              const speed = 25 + Math.random() * 65;
+              pArr.push({
+                x: 0,
+                y: 0,
+                vx: Math.cos(angle) * speed * (Math.random() > 0.5 ? 1 : -1),
+                vy: -Math.sin(angle) * speed,
+                size: 2.5 + Math.random() * 5,
+                color: ['#ef4444', '#f59e0b', '#fbbf24', '#38bdf8', '#ffffff'][Math.floor(Math.random() * 5)],
+                alpha: 1.0,
+                decay: 0.025 + Math.random() * 0.04,
+                gravity: 90,
+                life: 0
+              });
+            }
+          }
+
+          if (loopEnabledRef.current) {
+            if (!loopTimeoutRef.current) {
+              loopTimeoutRef.current = window.setTimeout(() => {
+                loopTimeoutRef.current = null;
+                triggerFire();
+              }, 1400);
+            }
+          } else {
+            isPlayingRef.current = false;
+            setIsPlaying(false);
+          }
+        }
+      }
+
+      // Draw canvas frame at native 60fps
       drawCanvas();
       animId = requestAnimationFrame(animate);
     };
 
     animId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animId);
-  }, [isPlaying, playbackSpeed, effectivePoints, playImpactSound]);
+    return () => {
+      cancelAnimationFrame(animId);
+      if (loopTimeoutRef.current) {
+        clearTimeout(loopTimeoutRef.current);
+        loopTimeoutRef.current = null;
+      }
+    };
+  }, [playImpactSound, triggerFire]);
 
-  // Main Canvas Rendering Routine
+  // Hardware-accelerated canvas rendering routine
   const drawCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -382,40 +357,85 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     const width = canvas.width;
     const height = canvas.height;
 
-    // Tactical view margins
     const padLeft = 85;
-    const padRight = 75;
+    const padRight = 80;
     const padBottom = 65;
-    const padTop = 50;
+    const padTop = 65;
 
     const groundY = height - padBottom;
     const originX = padLeft;
 
-    // Range scaling
-    const pts = effectivePoints;
-    const lastPt = pts[pts.length - 1];
-    const apexPt = [...pts].sort((a, b) => b.y - a.y)[0] || { x: 1, y: 1 };
+    // Ballistic physics constants and user inputs
+    const v0 = Math.max(1, Number(velocity));
+    const safeAngle = Math.max(0.5, Math.min(89.5, Number(angleDeg)));
+    const rad = (safeAngle * Math.PI) / 180;
+    const g = Number(gravity) > 0 ? Number(gravity) : 9.81;
 
-    const effectiveMaxRange = Math.max(15, (predictedRange || maxRange || lastPt.x) * 1.12);
-    const effectiveMaxHeight = Math.max(10, (predictedHeight || maxHeight || apexPt.y) * 1.3);
+    // Theoretical vacuum ballistic bounds
+    const theoRange = (v0 * v0 * Math.sin(2 * rad)) / g;
+    const theoHeight = (v0 * v0 * Math.sin(rad) * Math.sin(rad)) / (2 * g);
+    const totalFlightTime = (2 * v0 * Math.sin(rad)) / g;
+
+    // Use trained model prediction if available, else theoretical baseline
+    const targetDistance = (predictedRange && predictedRange > 0) ? predictedRange : theoRange;
+    const targetMaxHeight = (predictedHeight && predictedHeight > 0) ? predictedHeight : theoHeight;
+
+    const effectiveMaxRange = Math.max(15, targetDistance * 1.12);
+    const effectiveMaxHeight = Math.max(10, targetMaxHeight * 1.35);
 
     const scaleX = (width - padLeft - padRight) / effectiveMaxRange;
     const scaleY = (groundY - padTop) / effectiveMaxHeight;
 
-    // Clear with tactical dark gradient
+    // Aim gun barrel in canvas coordinates to align with trajectory takeoff
+    const screenAngleRad = Math.atan2(Math.sin(rad) * scaleY, Math.cos(rad) * scaleX);
+
+    // Gun placement & muzzle position
+    const gunBaseX = originX;
+    const gunBaseY = groundY;
+    const pivotX = gunBaseX;
+    const pivotY = gunBaseY - 22;
+
+    const barrelLength = 54;
+    const muzzleTipDist = 8 + barrelLength + 10; // 72px
+    const muzzleScreenX = pivotX + muzzleTipDist * Math.cos(screenAngleRad);
+    const muzzleScreenY = pivotY - muzzleTipDist * Math.sin(screenAngleRad);
+
+    // Target Stand & Bullseye placement
+    const targetSx = originX + targetDistance * scaleX;
+    const targetSy = groundY;
+    const targetCenterY = targetSy - 34;
+
+    // Apex marker placement
+    const apexSx = originX + (targetDistance / 2) * scaleX;
+    const apexSy = groundY - targetMaxHeight * scaleY;
+
+    // Smooth model-driven trajectory path formula connecting muzzle to target
+    const yMid = (muzzleScreenY + targetCenterY) / 2;
+    const getXAt = (u: number) => muzzleScreenX + u * (targetSx - muzzleScreenX);
+    const getYAt = (u: number) => (1 - u) * muzzleScreenY + u * targetCenterY - 4 * (yMid - apexSy) * u * (1 - u);
+
+    // 1. Theme-Harmonized Aerospace Testing Backdrop (Warm navy-slate, not pitch black)
     const skyGrad = ctx.createLinearGradient(0, 0, 0, groundY);
-    skyGrad.addColorStop(0, '#030712'); // Deep obsidian
-    skyGrad.addColorStop(0.5, '#0b1329'); // Night navy
-    skyGrad.addColorStop(1, '#0f172a'); // Horizon twilight
+    skyGrad.addColorStop(0, '#101c2e');
+    skyGrad.addColorStop(0.35, '#162740');
+    skyGrad.addColorStop(0.75, '#1e3352');
+    skyGrad.addColorStop(1, '#253e63');
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // Subtle tactical range grid lines
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = 'rgba(30, 41, 59, 0.45)';
+    // Apex elevation soft ambient illumination
+    const apexGlow = ctx.createRadialGradient(apexSx, apexSy, 15, apexSx, apexSy, Math.max(140, width * 0.35));
+    apexGlow.addColorStop(0, 'rgba(56, 189, 248, 0.16)');
+    apexGlow.addColorStop(0.5, 'rgba(34, 211, 238, 0.05)');
+    apexGlow.addColorStop(1, 'transparent');
+    ctx.fillStyle = apexGlow;
+    ctx.fillRect(0, 0, width, groundY);
 
-    // Vertical range interval grid ticks
-    const rangeStep = effectiveMaxRange > 5000 ? 2000 : effectiveMaxRange > 2000 ? 1000 : effectiveMaxRange > 500 ? 200 : 50;
+    // Grid ticks
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
+
+    const rangeStep = effectiveMaxRange > 50000 ? 10000 : effectiveMaxRange > 20000 ? 5000 : effectiveMaxRange > 5000 ? 2000 : effectiveMaxRange > 1000 ? 500 : 100;
     for (let rx = rangeStep; rx <= effectiveMaxRange; rx += rangeStep) {
       const gx = originX + rx * scaleX;
       if (gx < width - padRight + 20) {
@@ -426,172 +446,164 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Label downrange meters
-        ctx.fillStyle = 'rgba(100, 116, 139, 0.7)';
-        ctx.font = '9px monospace';
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = 'bold 9.5px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`${rx}m`, gx, groundY + 18);
+        ctx.fillText(`${(rx / 1000).toFixed(rx >= 10000 ? 0 : 1)}km`, gx, groundY + 18);
       }
     }
 
-    // Horizontal altitude grid lines
-    const heightStep = effectiveMaxHeight > 2000 ? 1000 : effectiveMaxHeight > 500 ? 200 : effectiveMaxHeight > 100 ? 50 : 20;
+    const heightStep = effectiveMaxHeight > 20000 ? 5000 : effectiveMaxHeight > 5000 ? 2000 : effectiveMaxHeight > 1000 ? 500 : effectiveMaxHeight > 200 ? 100 : 25;
     for (let ry = heightStep; ry <= effectiveMaxHeight; ry += heightStep) {
       const gy = groundY - ry * scaleY;
       if (gy > padTop) {
         ctx.beginPath();
-        ctx.setLineDash([2, 6]);
+        ctx.setLineDash([2, 5]);
         ctx.moveTo(originX, gy);
         ctx.lineTo(width - padRight, gy);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.fillStyle = 'rgba(100, 116, 139, 0.7)';
-        ctx.font = '9px monospace';
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = 'bold 9.5px monospace';
         ctx.textAlign = 'right';
-        ctx.fillText(`${ry}m`, originX - 10, gy + 3);
+        ctx.fillText(`${(ry / 1000).toFixed(ry >= 10000 ? 0 : 1)}km`, originX - 8, gy + 3.5);
       }
     }
 
-    // Reinforced ground terrain
+    // 2. Ground Runway & Baseline
     const groundGrad = ctx.createLinearGradient(0, groundY, 0, height);
     groundGrad.addColorStop(0, '#1e293b');
-    groundGrad.addColorStop(0.15, '#0f172a');
-    groundGrad.addColorStop(1, '#020617');
+    groundGrad.addColorStop(0.3, '#172436');
+    groundGrad.addColorStop(1, '#0f172a');
     ctx.fillStyle = groundGrad;
     ctx.fillRect(0, groundY, width, height - groundY);
 
-    // Heavy tactical ground baseline
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 2;
-    ctx.shadowColor = '#38bdf8';
-    ctx.shadowBlur = 6;
+    ctx.strokeStyle = '#0284c7';
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.moveTo(originX - 30, groundY);
     ctx.lineTo(width - padRight + 30, groundY);
     ctx.stroke();
-    ctx.shadowBlur = 0;
 
-    // Current projectile index based on progress
-    const floatIdx = currentProgress * (pts.length - 1);
-    const currIdx = Math.min(pts.length - 1, Math.floor(floatIdx));
-    const nextIdx = Math.min(pts.length - 1, currIdx + 1);
-    const frac = floatIdx - currIdx;
+    for (let rx = 0; rx <= effectiveMaxRange; rx += rangeStep / 2) {
+      const gx = originX + rx * scaleX;
+      if (gx < width - padRight + 20) {
+        ctx.beginPath();
+        ctx.moveTo(gx, groundY);
+        ctx.lineTo(gx, groundY + 5);
+        ctx.stroke();
+      }
+    }
 
-    const currPt = pts[currIdx] || pts[0];
-    const nextPt = pts[nextIdx] || currPt;
+    // 3. Projected Trajectory Curve & Area
+    if (showTrajectoryArcRef.current) {
+      const numSteps = 120;
+      const areaGrad = ctx.createLinearGradient(0, padTop, 0, groundY);
+      areaGrad.addColorStop(0, 'rgba(34, 211, 238, 0.18)');
+      areaGrad.addColorStop(0.65, 'rgba(34, 211, 238, 0.05)');
+      areaGrad.addColorStop(1, 'rgba(34, 211, 238, 0.0)');
 
-    // Interpolated world coordinates
-    const interpX = currPt.x + (nextPt.x - currPt.x) * frac;
-    const interpY = currPt.y + (nextPt.y - currPt.y) * frac;
-    const interpVx = currPt.vx + (nextPt.vx - currPt.vx) * frac;
-    const interpVy = currPt.vy + (nextPt.vy - currPt.vy) * frac;
-    const interpSpeed = Math.sqrt(interpVx * interpVx + interpVy * interpVy);
+      ctx.fillStyle = areaGrad;
+      ctx.beginPath();
+      ctx.moveTo(muzzleScreenX, groundY);
+      for (let i = 0; i <= numSteps; i++) {
+        const u = i / numSteps;
+        ctx.lineTo(getXAt(u), getYAt(u));
+      }
+      ctx.lineTo(targetSx, groundY);
+      ctx.closePath();
+      ctx.fill();
 
-    // Screen coordinates
-    const projScreenX = originX + interpX * scaleX;
-    const projScreenY = groundY - interpY * scaleY;
-
-    // -------------------------------------------------------------
-    // 1. PROJECTED TRAJECTORY PATH & TRACER ARC
-    // -------------------------------------------------------------
-    if (showTrajectoryArc && pts.length > 1) {
-      // Background full projected arc (faint dashed path)
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.18)';
-      ctx.lineWidth = 1.5;
+      // Dashed full trajectory guide from muzzle to target
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.55)';
+      ctx.lineWidth = 2;
       ctx.setLineDash([4, 4]);
       ctx.beginPath();
-      for (let i = 0; i < pts.length; i++) {
-        const px = originX + pts[i].x * scaleX;
-        const py = groundY - pts[i].y * scaleY;
+      for (let i = 0; i <= numSteps; i++) {
+        const u = i / numSteps;
+        const px = getXAt(u);
+        const py = getYAt(u);
         if (i === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
       }
       ctx.stroke();
       ctx.setLineDash([]);
-
-      // Active illuminated tracer path up to current projectile position
-      if (currentProgress > 0) {
-        ctx.strokeStyle = '#22d3ee';
-        ctx.lineWidth = 2.5;
-        ctx.shadowColor = '#06b6d4';
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        for (let i = 0; i <= currIdx; i++) {
-          const px = originX + pts[i].x * scaleX;
-          const py = groundY - pts[i].y * scaleY;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.lineTo(projScreenX, projScreenY);
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-      }
     }
 
-    // -------------------------------------------------------------
-    // 2. APEX (MAX HEIGHT) INDICATOR
-    // -------------------------------------------------------------
-    if (apexPt && apexPt.y > 0) {
-      const apexSx = originX + apexPt.x * scaleX;
-      const apexSy = groundY - apexPt.y * scaleY;
+    // Read current flight progress directly from progressRef
+    const curProg = progressRef.current;
+    const isStandby = curProg === 0 && !isPlayingRef.current;
+    const isImpacted = curProg >= 1.0;
 
-      // Vertical guideline to ground
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([2, 4]);
+    // Active illuminated tracer path up to bullet
+    if (showTrajectoryArcRef.current && curProg > 0) {
+      const curSteps = Math.max(1, Math.floor(curProg * 120));
+      ctx.strokeStyle = '#00f0ff';
+      ctx.lineWidth = 3.5;
       ctx.beginPath();
-      ctx.moveTo(apexSx, apexSy);
+      for (let i = 0; i <= curSteps; i++) {
+        const u = (i / curSteps) * curProg;
+        const px = getXAt(u);
+        const py = getYAt(u);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+
+    // 4. Prominent Apex (Max Height) Indicator
+    if (targetMaxHeight > 0) {
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.65)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(apexSx, apexSy + 6);
       ctx.lineTo(apexSx, groundY);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Apex Marker Dot
-      ctx.fillStyle = '#f59e0b';
-      ctx.shadowColor = '#f59e0b';
-      ctx.shadowBlur = 10;
+      const pulse = Math.sin(performance.now() * 0.006) * 3;
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.7)';
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(apexSx, apexSy, 4.5, 0, 2 * Math.PI);
-      ctx.fill();
-      ctx.shadowBlur = 0;
+      ctx.arc(apexSx, apexSy, 8 + pulse, 0, 2 * Math.PI);
+      ctx.stroke();
 
-      // Apex Badge
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 1;
+      ctx.fillStyle = '#fbbf24';
       ctx.beginPath();
-      ctx.roundRect(apexSx - 55, apexSy - 24, 110, 18, 4);
+      ctx.arc(apexSx, apexSy, 5, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(apexSx - 68, apexSy - 34, 136, 26, 6);
       ctx.fill();
       ctx.stroke();
 
       ctx.fillStyle = '#fbbf24';
-      ctx.font = 'bold 9px monospace';
+      ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`Apex: ${Math.round(apexPt.y)}m`, apexSx, apexSy - 11);
+      ctx.fillText(`▲ APEX: ${Math.round(targetMaxHeight).toLocaleString()} m`, apexSx, apexSy - 20);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '9px monospace';
+      ctx.fillText(`at ${(targetDistance / 2000).toFixed(1)} km downrange`, apexSx, apexSy - 10);
     }
 
-    // -------------------------------------------------------------
-    // 3. TARGET STAND & BULLSEYE AT LANDING POINT
-    // -------------------------------------------------------------
-    const targetDistance = predictedRange || lastPt.x;
-    const targetSx = originX + targetDistance * scaleX;
-    const targetSy = groundY;
-
-    // Draw Target A-Frame Stand
+    // 5. Target Stand & Bullseye at Landing Range
     ctx.strokeStyle = '#64748b';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    // Left leg
     ctx.moveTo(targetSx - 14, targetSy);
     ctx.lineTo(targetSx, targetSy - 38);
-    // Right leg
     ctx.lineTo(targetSx + 14, targetSy);
-    // Crossbar
     ctx.moveTo(targetSx - 9, targetSy - 14);
     ctx.lineTo(targetSx + 9, targetSy - 14);
     ctx.stroke();
 
-    // Target Pole
     ctx.strokeStyle = '#94a3b8';
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -599,7 +611,6 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     ctx.lineTo(targetSx, targetSy - 62);
     ctx.stroke();
 
-    // Fluttering Tactical Range Flag
     const flagWave = Math.sin(performance.now() * 0.005) * 3;
     ctx.fillStyle = '#ef4444';
     ctx.beginPath();
@@ -609,11 +620,7 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     ctx.closePath();
     ctx.fill();
 
-    // Circular Target Board Face (Concentric Bullseye Rings)
-    const targetCenterY = targetSy - 34;
-    const targetRadius = 14;
-
-    // Outer ring (white)
+    const targetRadius = 16;
     ctx.fillStyle = '#f8fafc';
     ctx.beginPath();
     ctx.arc(targetSx, targetCenterY, targetRadius, 0, 2 * Math.PI);
@@ -622,59 +629,47 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Ring 2 (black)
     ctx.fillStyle = '#0f172a';
     ctx.beginPath();
     ctx.arc(targetSx, targetCenterY, targetRadius * 0.75, 0, 2 * Math.PI);
     ctx.fill();
 
-    // Ring 3 (red)
-    ctx.fillStyle = '#ef4444';
+    ctx.fillStyle = '#0284c7';
     ctx.beginPath();
     ctx.arc(targetSx, targetCenterY, targetRadius * 0.5, 0, 2 * Math.PI);
     ctx.fill();
 
-    // Bullseye center (gold / yellow)
-    ctx.fillStyle = '#fbbf24';
+    ctx.fillStyle = '#ef4444';
     ctx.beginPath();
-    ctx.arc(targetSx, targetCenterY, targetRadius * 0.25, 0, 2 * Math.PI);
+    ctx.arc(targetSx, targetCenterY, targetRadius * 0.3, 0, 2 * Math.PI);
     ctx.fill();
 
-    // Target distance plaque beneath
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-    ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 1;
+    ctx.fillStyle = '#fbbf24';
     ctx.beginPath();
-    ctx.roundRect(targetSx - 42, targetSy + 8, 84, 18, 4);
+    ctx.arc(targetSx, targetCenterY, targetRadius * 0.15, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // Target Plaque
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(targetSx - 58, targetSy + 8, 116, 26, 6);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#f87171';
-    ctx.font = 'bold 9px monospace';
+    ctx.font = 'bold 11px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(`TARGET: ${Math.round(targetDistance)}m`, targetSx, targetSy + 20);
+    ctx.fillText(`🎯 RANGE: ${Math.round(targetDistance).toLocaleString()} m`, targetSx, targetSy + 22);
 
-    // Bullet hole in target if reached impact
-    if (hasTriggeredImpactRef.current) {
-      ctx.fillStyle = '#000000';
-      ctx.beginPath();
-      ctx.arc(targetSx + 1, targetCenterY - 1, 3.5, 0, 2 * Math.PI);
-      ctx.fill();
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 0.8;
-      ctx.stroke();
-    }
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '9px monospace';
+    ctx.fillText(`(${(targetDistance / 1000).toFixed(1)} km)`, targetSx, targetSy + 31);
 
-    // -------------------------------------------------------------
-    // 4. REALISTIC ARTILLERY / CANNON GUN AT ORIGIN
-    // -------------------------------------------------------------
-    const gunBaseX = originX;
-    const gunBaseY = groundY;
-
-    // Firing platform concrete pad
+    // 6. Artillery Cannon at Origin - Pointed at exact angle set by user
     ctx.fillStyle = '#334155';
     ctx.fillRect(gunBaseX - 35, gunBaseY - 6, 70, 6);
-    // Caution hazard stripes on pad
     ctx.fillStyle = '#eab308';
     for (let sx = -30; sx < 30; sx += 14) {
       ctx.beginPath();
@@ -685,7 +680,6 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
       ctx.fill();
     }
 
-    // Heavy Gun Carriage / Turret Mount
     ctx.fillStyle = '#1e293b';
     ctx.strokeStyle = '#475569';
     ctx.lineWidth = 2;
@@ -698,35 +692,25 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     ctx.fill();
     ctx.stroke();
 
-    // Elevation Pivot Trunnion (Center of rotation)
-    const pivotX = gunBaseX;
-    const pivotY = gunBaseY - 22;
-
-    // Elevation Angle Arc / Dial
-    const radAngle = (angleDeg * Math.PI) / 180;
-    ctx.strokeStyle = 'rgba(34, 211, 238, 0.4)';
-    ctx.lineWidth = 1;
+    // Angle protractor arc showing user-selected angle
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.6)';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(pivotX, pivotY, 26, 0, -radAngle, true);
+    ctx.arc(pivotX, pivotY, 28, 0, -screenAngleRad, true);
     ctx.stroke();
 
-    // Elevation Degree Label
-    ctx.fillStyle = '#22d3ee';
-    ctx.font = 'bold 9px monospace';
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText(`${angleDeg.toFixed(1)}°`, pivotX + 28, pivotY - 8);
+    ctx.fillText(`${angleDeg.toFixed(1)}°`, pivotX + 32, pivotY - 8);
 
-    // Dynamic Recoil displacement along barrel axis (moves backwards on shot)
     const recoilDist = recoilRef.current * 14;
 
     ctx.save();
     ctx.translate(pivotX, pivotY);
-    ctx.rotate(-radAngle); // Canvas Y is inverted, so negative angle rotates upward
-
-    // Slide barrel backwards along X axis for recoil kick
+    ctx.rotate(-screenAngleRad);
     ctx.translate(-recoilDist, 0);
 
-    // 1. Cannon Breech Mechanism (heavy rectangular receiver)
     const breechGrad = ctx.createLinearGradient(0, -9, 0, 9);
     breechGrad.addColorStop(0, '#64748b');
     breechGrad.addColorStop(0.5, '#334155');
@@ -739,8 +723,6 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     ctx.fill();
     ctx.stroke();
 
-    // 2. Long Rifled Steel Barrel
-    const barrelLength = 54;
     const barrelGrad = ctx.createLinearGradient(0, -6, 0, 6);
     barrelGrad.addColorStop(0, '#94a3b8');
     barrelGrad.addColorStop(0.3, '#cbd5e1');
@@ -756,7 +738,6 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     ctx.fill();
     ctx.stroke();
 
-    // 3. Heavy Double-Baffle Muzzle Brake at barrel tip
     ctx.fillStyle = '#1e293b';
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 1;
@@ -765,62 +746,38 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     ctx.fill();
     ctx.stroke();
 
-    // Brake vents
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(8 + barrelLength + 1, -6.5, 2.5, 13);
-    ctx.fillRect(8 + barrelLength + 5.5, -6.5, 2.5, 13);
-
-    // Muzzle tip position for flash calculation
     const tipX = 8 + barrelLength + 10;
     const tipY = 0;
 
-    // 4. Muzzle Flash & Expanding Plasma Shockwave on Firing!
+    // Gunfire Muzzle Flash Flare
     if (muzzleFlashRef.current > 0.05) {
       const flashScale = muzzleFlashRef.current;
 
-      // Layer A: Expanding spherical blast shockwave
-      ctx.strokeStyle = `rgba(56, 189, 248, ${flashScale * 0.7})`;
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = `rgba(56, 189, 248, ${flashScale * 0.8})`;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.arc(tipX, tipY, 18 + (1 - flashScale) * 35, 0, 2 * Math.PI);
       ctx.stroke();
 
-      // Layer B: Violent conical flame burst
-      const flameGrad = ctx.createRadialGradient(tipX, tipY, 2, tipX + 16, tipY, 40 * flashScale);
-      flameGrad.addColorStop(0, '#ffffff'); // White-hot core
-      flameGrad.addColorStop(0.2, '#fef08a'); // Brilliant yellow
-      flameGrad.addColorStop(0.6, '#f97316'); // Blazing orange
-      flameGrad.addColorStop(1, 'rgba(239, 68, 68, 0)'); // Fading flame
+      const flameGrad = ctx.createRadialGradient(tipX, tipY, 2, tipX + 16, tipY, 42 * flashScale);
+      flameGrad.addColorStop(0, '#ffffff');
+      flameGrad.addColorStop(0.2, '#fef08a');
+      flameGrad.addColorStop(0.6, '#f97316');
+      flameGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
 
       ctx.fillStyle = flameGrad;
-      ctx.shadowColor = '#f59e0b';
-      ctx.shadowBlur = 25;
       ctx.beginPath();
       ctx.moveTo(tipX, -4);
-      // Main forward blast petal
-      ctx.lineTo(tipX + 45 * flashScale, -15 * flashScale);
-      ctx.lineTo(tipX + 60 * flashScale, 0);
-      ctx.lineTo(tipX + 45 * flashScale, 15 * flashScale);
+      ctx.lineTo(tipX + 48 * flashScale, -16 * flashScale);
+      ctx.lineTo(tipX + 64 * flashScale, 0);
+      ctx.lineTo(tipX + 48 * flashScale, 16 * flashScale);
       ctx.lineTo(tipX, 4);
       ctx.closePath();
       ctx.fill();
-
-      // Side brake vent jet bursts (90° side flame spikes)
-      ctx.beginPath();
-      ctx.moveTo(tipX - 6, -8);
-      ctx.lineTo(tipX - 2, -26 * flashScale);
-      ctx.lineTo(tipX + 4, -8);
-      ctx.moveTo(tipX - 6, 8);
-      ctx.lineTo(tipX - 2, 26 * flashScale);
-      ctx.lineTo(tipX + 4, 8);
-      ctx.fill();
-
-      ctx.shadowBlur = 0;
     }
 
     ctx.restore();
 
-    // Pivot cap hub on mount
     ctx.fillStyle = '#64748b';
     ctx.beginPath();
     ctx.arc(pivotX, pivotY, 6, 0, 2 * Math.PI);
@@ -829,153 +786,274 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // -------------------------------------------------------------
-    // 5. SMOKE PARTICLES & IMPACT DEBRIS
-    // -------------------------------------------------------------
+    // 7. Blast & Impact Particles
     for (const p of particlesRef.current) {
       ctx.save();
       ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
       ctx.fillStyle = p.color;
       ctx.beginPath();
-      ctx.arc(originX + p.x, groundY + p.y, Math.max(1, p.size), 0, 2 * Math.PI);
+      ctx.arc((isImpacted ? targetSx : muzzleScreenX) + p.x, (isImpacted ? targetCenterY : muzzleScreenY) + p.y, Math.max(1, p.size), 0, 2 * Math.PI);
       ctx.fill();
       ctx.restore();
     }
 
     // -------------------------------------------------------------
-    // 6. REALISTIC SPITZER BULLET & TRACER IN FLIGHT
+    // 8. BOLD & UNMISTAKABLY VISIBLE BULLET SHOT (ZERO-LAG RENDER)
+    // Scaled to 52px length x 18px height with bright flame flare,
+    // motion light ribbon, Mach wings, and glowing targeting brackets
     // -------------------------------------------------------------
-    if (currentProgress < 1.0 && currentProgress > 0) {
-      // Compute flight tangent angle
-      const flyAngle = Math.atan2(-interpVy * scaleY, interpVx * scaleX);
+    const bulletScreenX = isImpacted ? targetSx : isStandby ? muzzleScreenX : getXAt(curProg);
+    const bulletScreenY = isImpacted ? targetCenterY : isStandby ? muzzleScreenY : getYAt(curProg);
 
+    let flyAngle = -screenAngleRad;
+    if (isImpacted) {
+      flyAngle = Math.atan2(targetCenterY - getYAt(0.98), targetSx - getXAt(0.98));
+    } else if (!isStandby) {
+      const uNext = Math.min(1.0, curProg + 0.005);
+      flyAngle = Math.atan2(getYAt(uNext) - bulletScreenY, getXAt(uNext) - bulletScreenX);
+    }
+
+    // Live Telemetry Physical Values
+    const interpX = curProg * targetDistance;
+    const interpY = Math.max(0, 4 * targetMaxHeight * curProg * (1 - curProg));
+    const tElapsed = curProg * totalFlightTime;
+    const vx = v0 * Math.cos(rad);
+    const vy = v0 * Math.sin(rad) - g * tElapsed;
+    const interpSpeed = isImpacted ? Math.sqrt(vx * vx + vy * vy) : isStandby ? v0 : Math.sqrt(vx * vx + vy * vy);
+
+    // Instant lag-free telemetry update directly into DOM elements
+    if (liveDownrangeDomRef.current) liveDownrangeDomRef.current.textContent = `${Math.round(interpX).toLocaleString()} m`;
+    if (liveAltDomRef.current) liveAltDomRef.current.textContent = `${Math.round(interpY).toLocaleString()} m`;
+    if (liveSpeedDomRef.current) liveSpeedDomRef.current.textContent = `${Math.round(interpSpeed)} m/s (Mach ${(interpSpeed / 343).toFixed(1)})`;
+
+    // Glowing motion tracer ribbon trailing behind bullet in flight
+    if (!isStandby && !isImpacted && curProg > 0.01) {
       ctx.save();
-      ctx.translate(projScreenX, projScreenY);
-      ctx.rotate(flyAngle);
+      const trailCount = 14;
+      for (let i = 0; i < trailCount; i++) {
+        const uA = Math.max(0, curProg - (i / 120));
+        const uB = Math.max(0, curProg - ((i + 1) / 120));
+        const ax = getXAt(uA);
+        const ay = getYAt(uA);
+        const bx = getXAt(uB);
+        const by = getYAt(uB);
 
-      // Supersonic Mach Cone Envelope (if speed > 343 m/s)
-      if (interpSpeed > 343) {
-        ctx.strokeStyle = 'rgba(34, 211, 238, 0.4)';
-        ctx.lineWidth = 1;
+        const trailRatio = 1 - i / trailCount;
+        ctx.strokeStyle = `rgba(251, 191, 36, ${trailRatio * 0.85})`;
+        ctx.lineWidth = trailRatio * 6 + 1.2;
         ctx.beginPath();
-        ctx.moveTo(12, 0);
-        ctx.lineTo(-24, -14);
-        ctx.moveTo(12, 0);
-        ctx.lineTo(-24, 14);
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
         ctx.stroke();
       }
+      ctx.restore();
+    }
 
-      // Incendiary Tracer Base Flare (bright burning glow at rear)
-      const tracerGrad = ctx.createRadialGradient(-7, 0, 1, -12, 0, 14);
-      tracerGrad.addColorStop(0, '#ffffff');
-      tracerGrad.addColorStop(0.3, '#fbbf24');
-      tracerGrad.addColorStop(0.7, '#f97316');
-      tracerGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+    // Render the Bullet Model
+    ctx.save();
+    ctx.translate(bulletScreenX, bulletScreenY);
+    ctx.rotate(flyAngle);
 
-      ctx.fillStyle = tracerGrad;
-      ctx.shadowColor = '#fbbf24';
-      ctx.shadowBlur = 14;
+    // Mach Cone Shockwave Wings
+    if (!isStandby && !isImpacted && interpSpeed > 280) {
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+      ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.arc(-7, 0, 10, 0, 2 * Math.PI);
+      ctx.moveTo(26, 0);
+      ctx.lineTo(-42, -26);
+      ctx.moveTo(26, 0);
+      ctx.lineTo(-42, 26);
+      ctx.stroke();
+    }
+
+    // High-Intensity Rocket / Incendiary Exhaust Flare
+    if (!isStandby && !isImpacted) {
+      const flicker = 1 + (Math.sin(performance.now() * 0.03) * 0.2);
+
+      // Layer 1: Radiant Outer Flame Glow
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.35)';
+      ctx.beginPath();
+      ctx.arc(-18, 0, 28 * flicker, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Aerodynamic Spitzer Bullet Body (Pointed ogive, copper jacket)
-      const bulletGrad = ctx.createLinearGradient(0, -4, 0, 4);
-      bulletGrad.addColorStop(0, '#fbbf24'); // Copper highlight
-      bulletGrad.addColorStop(0.3, '#f59e0b'); // Warm brass
-      bulletGrad.addColorStop(0.7, '#d97706'); // Copper base
-      bulletGrad.addColorStop(1, '#78350f'); // Shadow underside
+      // Layer 2: Multi-stop Core Exhaust Jet
+      const flameGrad = ctx.createRadialGradient(-14, 0, 2, -28, 0, 36 * flicker);
+      flameGrad.addColorStop(0, '#ffffff'); // White-hot plasma core
+      flameGrad.addColorStop(0.2, '#fef08a'); // Brilliant yellow
+      flameGrad.addColorStop(0.5, '#f59e0b'); // Blazing amber
+      flameGrad.addColorStop(0.8, '#ea580c'); // Deep fire orange
+      flameGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
 
-      ctx.fillStyle = bulletGrad;
-      ctx.strokeStyle = '#92400e';
-      ctx.lineWidth = 0.8;
+      ctx.fillStyle = flameGrad;
       ctx.beginPath();
-      // Boat-tail rear
-      ctx.moveTo(-7, -2.5);
-      // Cylindrical shank
-      ctx.lineTo(-1, -3.5);
-      // Ogive curved nose
-      ctx.quadraticCurveTo(7, -3, 11, 0);
-      ctx.quadraticCurveTo(7, 3, -1, 3.5);
-      // Bottom boat tail
-      ctx.lineTo(-7, 2.5);
+      ctx.arc(-16, 0, 22 * flicker, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Exhaust cone jet
+      ctx.beginPath();
+      ctx.moveTo(-12, -7);
+      ctx.lineTo(-48 * flicker, 0);
+      ctx.lineTo(-12, 7);
       ctx.closePath();
       ctx.fill();
+    }
+
+    // Bullet Metallic Spitzer Body (Large & Ultra-Visible: 50px length x 18px height)
+    const bulletGrad = ctx.createLinearGradient(0, -9, 0, 9);
+    bulletGrad.addColorStop(0, '#ffffff'); // High-contrast metallic reflection
+    bulletGrad.addColorStop(0.18, '#fef08a'); // Gleaming gold
+    bulletGrad.addColorStop(0.45, '#f59e0b'); // Polished brass
+    bulletGrad.addColorStop(0.75, '#b45309'); // Rich copper jacket
+    bulletGrad.addColorStop(1, '#451a03'); // Shadow underside
+
+    ctx.fillStyle = bulletGrad;
+    ctx.strokeStyle = '#291102';
+    ctx.lineWidth = 1.8;
+
+    ctx.beginPath();
+    // Boat-tail base
+    ctx.moveTo(-16, -5.5);
+    // Cylindrical shank
+    ctx.lineTo(-3, -8.5);
+    // Ogive curved pointed tip
+    ctx.quadraticCurveTo(14, -8, 28, 0);
+    ctx.quadraticCurveTo(14, 8, -3, 8.5);
+    // Underside boat-tail
+    ctx.lineTo(-16, 5.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Copper driving band (rifling groove)
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(-8, -7.5);
+    ctx.lineTo(-8, 7.5);
+    ctx.stroke();
+
+    // Top metallic gleam streak
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(-5, -5.5);
+    ctx.quadraticCurveTo(10, -5, 22, -0.8);
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Tactical Pulsing Targeting Reticle & Brackets Around Bullet
+    if (!isStandby && !isImpacted) {
+      const pulseRing = Math.sin(performance.now() * 0.008) * 4;
+      ctx.strokeStyle = 'rgba(34, 211, 238, 0.9)';
+      ctx.lineWidth = 1.8;
+
+      // Dashed tracking circle
+      ctx.beginPath();
+      ctx.setLineDash([4, 4]);
+      ctx.arc(bulletScreenX, bulletScreenY, 30 + pulseRing, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 4 Tactical corner crosshair brackets
+      const bDist = 34 + pulseRing;
+      const bLen = 9;
+      ctx.strokeStyle = '#00f0ff';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      // Top-Left
+      ctx.moveTo(bulletScreenX - bDist, bulletScreenY - bDist + bLen);
+      ctx.lineTo(bulletScreenX - bDist, bulletScreenY - bDist);
+      ctx.lineTo(bulletScreenX - bDist + bLen, bulletScreenY - bDist);
+      // Top-Right
+      ctx.moveTo(bulletScreenX + bDist - bLen, bulletScreenY - bDist);
+      ctx.lineTo(bulletScreenX + bDist, bulletScreenY - bDist);
+      ctx.lineTo(bulletScreenX + bDist, bulletScreenY - bDist + bLen);
+      // Bottom-Left
+      ctx.moveTo(bulletScreenX - bDist, bulletScreenY + bDist - bLen);
+      ctx.lineTo(bulletScreenX - bDist, bulletScreenY + bDist);
+      ctx.lineTo(bulletScreenX - bDist + bLen, bulletScreenY + bDist);
+      // Bottom-Right
+      ctx.moveTo(bulletScreenX + bDist - bLen, bulletScreenY + bDist);
+      ctx.lineTo(bulletScreenX + bDist, bulletScreenY + bDist);
+      ctx.lineTo(bulletScreenX + bDist, bulletScreenY + bDist - bLen);
       ctx.stroke();
 
-      // Bullet Driving Band Groove
-      ctx.strokeStyle = '#451a03';
-      ctx.lineWidth = 1;
+      // High-contrast floating Telemetry HUD Tag above bullet
+      const hudY = Math.max(padTop + 5, bulletScreenY - 44);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(-4, -3.2);
-      ctx.lineTo(-4, 3.2);
+      ctx.roundRect(bulletScreenX + 22, hudY, 150, 34, 6);
+      ctx.fill();
       ctx.stroke();
 
-      ctx.shadowBlur = 0;
-      ctx.restore();
+      ctx.fillStyle = '#00f0ff';
+      ctx.font = 'bold 10.5px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`● BULLET: ${Math.round(interpSpeed)} m/s`, bulletScreenX + 28, hudY + 14);
 
-      // Floating live speed telemetry tag beside projectile
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
-      ctx.lineWidth = 1;
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '9.5px monospace';
+      ctx.fillText(`Alt: ${Math.round(interpY).toLocaleString()}m | ${(interpX / 1000).toFixed(1)}km`, bulletScreenX + 28, hudY + 27);
+    } else if (isStandby) {
+      // Clean Standby Pill Indicator: Shows gun is locked, loaded and ready to fire at set angle
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.roundRect(projScreenX + 14, projScreenY - 24, 96, 20, 4);
+      ctx.roundRect(muzzleScreenX + 18, muzzleScreenY - 38, 175, 34, 6);
       ctx.fill();
       ctx.stroke();
 
       ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 9px monospace';
+      ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(`v=${Math.round(interpSpeed)} m/s`, projScreenX + 19, projScreenY - 10);
-    }
-
-    // -------------------------------------------------------------
-    // 7. TERMINAL IMPACT EVENT BANNER
-    // -------------------------------------------------------------
-    if (hasTriggeredImpactRef.current) {
-      // Flash halo around target
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
-      ctx.beginPath();
-      ctx.arc(targetSx, targetCenterY, 35, 0, 2 * Math.PI);
-      ctx.fill();
-
-      // Top-center impact confirmation HUD banner
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
-      ctx.strokeStyle = '#10b981';
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = '#10b981';
-      ctx.shadowBlur = 12;
-
-      const bannerWidth = 260;
-      const bannerX = width / 2 - bannerWidth / 2;
-      const bannerY = padTop + 10;
-
-      ctx.beginPath();
-      ctx.roundRect(bannerX, bannerY, bannerWidth, 42, 8);
-      ctx.fill();
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      ctx.fillStyle = '#34d399';
-      ctx.font = 'bold 12px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('DIRECT TARGET IMPACT!', width / 2, bannerY + 18);
+      ctx.fillText(`● READY • ELEVATION: ${angleDeg.toFixed(1)}°`, muzzleScreenX + 26, muzzleScreenY - 22);
 
       ctx.fillStyle = '#94a3b8';
+      ctx.font = '9px monospace';
+      ctx.fillText('Click RUN MODEL PREDICTION', muzzleScreenX + 26, muzzleScreenY - 10);
+    }
+
+    // 9. Terminal Impact Banner
+    if (hasTriggeredImpactRef.current) {
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
+      ctx.beginPath();
+      ctx.arc(targetSx, targetCenterY, 38, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 2;
+
+      const bannerWidth = 290;
+      const bannerX = width / 2 - bannerWidth / 2;
+      const bannerY = padTop + 8;
+
+      ctx.beginPath();
+      ctx.roundRect(bannerX, bannerY, bannerWidth, 44, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#34d399';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🎯 DIRECT TARGET IMPACT!', width / 2, bannerY + 18);
+
+      ctx.fillStyle = '#cbd5e1';
       ctx.font = '10px monospace';
       ctx.fillText(
-        `Range: ${Math.round(targetDistance)}m  •  Flight Time: ${lastPt.t || 0}s`,
+        `Range: ${Math.round(targetDistance).toLocaleString()}m  •  Flight: ${(totalFlightTime || 0).toFixed(1)}s`,
         width / 2,
-        bannerY + 33
+        bannerY + 34
       );
     }
   };
 
-  const currPt = effectivePoints[Math.min(effectivePoints.length - 1, Math.floor(currentProgress * (effectivePoints.length - 1)))] || effectivePoints[0];
-  const lastPt = effectivePoints[effectivePoints.length - 1] || currPt;
-
   return (
-    <div className="glass-card p-4 rounded-xl border border-slate-800 space-y-3">
+    <div className="glass-card p-4 rounded-xl border border-slate-700/60 shadow-lg space-y-3">
       {/* Visualizer Header */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
         <div className="flex items-center gap-2">
@@ -985,20 +1063,43 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
           <div>
             <h3 className="text-xs font-bold text-slate-100 uppercase tracking-wider flex items-center gap-1.5 font-mono">
               <span>Dynamic Firing Range Simulation</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-cyan-400 animate-ping' : 'bg-emerald-400'}`}></span>
             </h3>
             <p className="text-[10px] text-slate-400 font-mono">
-              Artillery Muzzle Blast &bull; Supersonic Tracer &bull; Downrange Target Impact
+              Gun aimed at user angle ({angleDeg.toFixed(1)}°) &bull; Bullet follows trained model trajectory &bull; Stable standby
             </p>
           </div>
         </div>
 
-        {/* Audio & Display Options */}
+        {/* Audio, Path & Loop Options */}
         <div className="flex items-center gap-2">
+          {/* Continuous Loop Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              const nextVal = !loopEnabled;
+              setLoopEnabled(nextVal);
+              loopEnabledRef.current = nextVal;
+            }}
+            className={`p-1.5 rounded-lg border text-xs font-mono flex items-center gap-1 transition-all ${
+              loopEnabled
+                ? 'bg-purple-500/10 border-purple-500/40 text-purple-300'
+                : 'bg-slate-900 border-slate-800 text-slate-500'
+            }`}
+            title={loopEnabled ? 'Auto-Loop Firing Active' : 'Single Shot Mode (Stable)'}
+          >
+            <Repeat className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{loopEnabled ? 'LOOP ON' : 'LOOP OFF'}</span>
+          </button>
+
           {/* Audio SFX Toggle */}
           <button
             type="button"
-            onClick={() => setSoundEnabled(!soundEnabled)}
+            onClick={() => {
+              const nextVal = !soundEnabled;
+              setSoundEnabled(nextVal);
+              soundEnabledRef.current = nextVal;
+            }}
             className={`p-1.5 rounded-lg border text-xs font-mono flex items-center gap-1 transition-all ${
               soundEnabled
                 ? 'bg-amber-500/10 border-amber-500/40 text-amber-300'
@@ -1010,10 +1111,14 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
             <span className="hidden sm:inline">{soundEnabled ? 'SFX ON' : 'MUTED'}</span>
           </button>
 
-          {/* Trace Arc Toggle */}
+          {/* Path Arc Toggle */}
           <button
             type="button"
-            onClick={() => setShowTrajectoryArc(!showTrajectoryArc)}
+            onClick={() => {
+              const nextVal = !showTrajectoryArc;
+              setShowTrajectoryArc(nextVal);
+              showTrajectoryArcRef.current = nextVal;
+            }}
             className={`p-1.5 rounded-lg border text-xs font-mono flex items-center gap-1 transition-all ${
               showTrajectoryArc
                 ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300'
@@ -1027,8 +1132,8 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Main Canvas Container */}
-      <div className="relative w-full overflow-hidden rounded-xl bg-slate-950 border border-slate-900 shadow-2xl">
+      {/* Main Canvas Container (Refined aerospace testing viewport) */}
+      <div className="relative w-full overflow-hidden rounded-xl bg-slate-900/90 border border-slate-700/80 shadow-2xl">
         <canvas
           ref={canvasRef}
           width={820}
@@ -1036,49 +1141,53 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
           className="w-full h-auto block select-none"
         />
 
-        {/* Top-Right HUD Overlay */}
+        {/* Top-Right Telemetry Badges (Instant updates without React re-render) */}
         <div className="absolute top-3 right-3 flex flex-col gap-1 items-end pointer-events-none">
-          <div className="px-2.5 py-1 rounded bg-slate-950/80 border border-slate-800 text-[10px] font-mono text-cyan-300 backdrop-blur-sm">
-            VELOCITY: <strong>{Math.round(currPt.v)} m/s</strong> (Mach {(currPt.v / 343).toFixed(1)})
+          <div className="px-2.5 py-1 rounded bg-slate-950/85 border border-cyan-500/40 text-[10px] font-mono text-cyan-300 backdrop-blur-sm shadow-md">
+            BULLET SPEED: <strong ref={liveSpeedDomRef}>{Math.round(velocity)} m/s</strong>
           </div>
-          <div className="px-2.5 py-1 rounded bg-slate-950/80 border border-slate-800 text-[10px] font-mono text-emerald-300 backdrop-blur-sm">
-            ELEVATION: <strong>{angleDeg.toFixed(1)}°</strong>
+          <div className="px-2.5 py-1 rounded bg-slate-950/85 border border-amber-500/40 text-[10px] font-mono text-amber-300 backdrop-blur-sm shadow-md">
+            MAX HEIGHT: <strong>{Math.round(predictedHeight || maxHeight).toLocaleString()} m</strong>
           </div>
-          <div className="px-2.5 py-1 rounded bg-slate-950/80 border border-slate-800 text-[10px] font-mono text-amber-300 backdrop-blur-sm">
-            TARGET RANGE: <strong>{Math.round(predictedRange || lastPt.x)} m</strong>
+          <div className="px-2.5 py-1 rounded bg-slate-950/85 border border-emerald-500/40 text-[10px] font-mono text-emerald-300 backdrop-blur-sm shadow-md">
+            TARGET RANGE: <strong>{Math.round(predictedRange || maxRange).toLocaleString()} m</strong>
           </div>
         </div>
       </div>
 
       {/* Interactive Firing & Playback Controls Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-        {/* BIG TACTICAL FIRE TRIGGER BUTTON */}
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={triggerFire}
+            onClick={() => {
+              triggerFire();
+              if (onFire) onFire();
+            }}
             disabled={loading}
             className="py-2 px-4 rounded-xl bg-gradient-to-r from-red-600 via-amber-600 to-amber-500 hover:from-red-500 hover:to-amber-400 active:scale-95 text-white font-extrabold text-xs shadow-lg shadow-amber-900/30 border border-amber-400/40 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
             <Flame className="w-4 h-4 text-yellow-200 fill-yellow-300 animate-pulse" />
-            <span>{currentProgress >= 1.0 ? 'RELOAD & SHOOT' : 'FIRE GUN'}</span>
+            <span>FIRE BULLET</span>
           </button>
 
-          {/* Pause / Play */}
           <button
             type="button"
-            onClick={() => setIsPlaying(!isPlaying)}
-            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-mono flex items-center gap-1.5 transition-all"
+            onClick={() => {
+              const nextVal = !isPlaying;
+              setIsPlaying(nextVal);
+              isPlayingRef.current = nextVal;
+            }}
+            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-mono flex items-center gap-1.5 transition-all"
           >
             {isPlaying ? <Pause className="w-3.5 h-3.5 text-amber-400" /> : <Play className="w-3.5 h-3.5 text-cyan-400" />}
             <span>{isPlaying ? 'Pause' : 'Play'}</span>
           </button>
 
-          {/* Replay */}
           <button
             type="button"
             onClick={triggerFire}
-            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 text-xs font-mono transition-all"
+            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 text-xs font-mono transition-all"
             title="Replay Shot"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -1086,13 +1195,16 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
         </div>
 
         {/* Speed Controls */}
-        <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-mono">
-          <span className="text-[10px] text-slate-500 px-2 font-bold uppercase">Speed:</span>
+        <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-700 text-xs font-mono">
+          <span className="text-[10px] text-slate-400 px-2 font-bold uppercase">Speed:</span>
           {[0.25, 0.5, 1, 2].map((spd) => (
             <button
               key={spd}
               type="button"
-              onClick={() => setPlaybackSpeed(spd)}
+              onClick={() => {
+                setPlaybackSpeed(spd);
+                playbackSpeedRef.current = spd;
+              }}
               className={`px-2 py-1 rounded-lg transition-colors ${
                 playbackSpeed === spd
                   ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/40'
@@ -1105,33 +1217,33 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Telemetry Readout Grid */}
+      {/* Telemetry Readout Grid (Live lag-free DOM updates) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-800/80 text-xs font-mono">
-        <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/60">
-          <div className="text-[10px] text-slate-500 uppercase font-bold">Current Downrange</div>
-          <div className="text-sm font-bold text-cyan-300 mt-0.5">
-            {Math.round(currPt.x)} m
+        <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-700/80">
+          <div className="text-[10px] text-slate-400 uppercase font-bold">Bullet Downrange</div>
+          <div ref={liveDownrangeDomRef} className="text-sm font-bold text-cyan-300 mt-0.5">
+            0 m
           </div>
         </div>
 
-        <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/60">
-          <div className="text-[10px] text-slate-500 uppercase font-bold">Current Altitude</div>
-          <div className="text-sm font-bold text-emerald-300 mt-0.5">
-            {Math.round(currPt.y)} m
+        <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-700/80">
+          <div className="text-[10px] text-slate-400 uppercase font-bold">Bullet Altitude</div>
+          <div ref={liveAltDomRef} className="text-sm font-bold text-emerald-300 mt-0.5">
+            0 m
           </div>
         </div>
 
-        <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/60">
-          <div className="text-[10px] text-slate-500 uppercase font-bold">Flight Time</div>
+        <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-700/80">
+          <div className="text-[10px] text-slate-400 uppercase font-bold">Apex Max Height</div>
           <div className="text-sm font-bold text-amber-300 mt-0.5">
-            {currPt.t.toFixed(2)} s
+            {Math.round(predictedHeight || maxHeight).toLocaleString()} m
           </div>
         </div>
 
-        <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/60">
-          <div className="text-[10px] text-slate-500 uppercase font-bold">Target Distance</div>
+        <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-700/80">
+          <div className="text-[10px] text-slate-400 uppercase font-bold">Target Max Range</div>
           <div className="text-sm font-bold text-rose-300 mt-0.5">
-            {Math.round(predictedRange || lastPt.x)} m
+            {Math.round(predictedRange || maxRange).toLocaleString()} m
           </div>
         </div>
       </div>

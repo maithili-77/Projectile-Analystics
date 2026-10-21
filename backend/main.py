@@ -19,6 +19,7 @@ if BACKEND_DIR not in sys.path:
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, List
+from datetime import datetime
 
 from backend.services.model_loader import load_all_models
 from backend.services.analytics_service import cache_dataset_summaries, get_dataset_summary, get_all_datasets_metadata
@@ -86,12 +87,32 @@ def get_model_metrics():
     """GET /api/model/metrics - Returns offline training R^2, RMSE, MAE benchmarks for models."""
     return registry.get_model_metrics()
 
+# In-memory prediction history log
+prediction_history_db: List[Dict[str, Any]] = []
+
+def record_backend_history(domain: str, input_dict: Dict[str, Any], pred_result: PredictionResult):
+    item = {
+        "id": f"pred_{int(datetime.utcnow().timestamp() * 1000)}",
+        "type": domain,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "model_name": pred_result.model_name,
+        "domain_score": pred_result.domain_score,
+        "domain_coverage_explanation": pred_result.domain_coverage_explanation,
+        "input": input_dict,
+        "output": pred_result.prediction
+    }
+    prediction_history_db.insert(0, item)
+    if len(prediction_history_db) > 100:
+        prediction_history_db.pop()
+
 # 5. Trajectory Prediction Endpoint
 @app.post("/api/predict/trajectory", response_model=PredictionResult)
 def predict_trajectory(input_data: TrajectoryInput):
     """POST /api/predict/trajectory - Predicts downrange distance and max height from velocity, angle, gravity."""
     try:
-        return predict_trajectory_service(input_data)
+        res = predict_trajectory_service(input_data)
+        record_backend_history("Trajectory", input_data.model_dump(), res)
+        return res
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -103,7 +124,9 @@ def predict_trajectory(input_data: TrajectoryInput):
 def predict_performance(input_data: PerformanceInput):
     """POST /api/predict/performance - Predicts V100, V200, E100, E200, BD100, BD200 for small arms cartridges."""
     try:
-        return predict_performance_service(input_data)
+        res = predict_performance_service(input_data)
+        record_backend_history("Performance", input_data.model_dump(), res)
+        return res
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -115,7 +138,9 @@ def predict_performance(input_data: PerformanceInput):
 def predict_v50(input_data: V50Input):
     """POST /api/predict/v50 - Predicts 50% armor perforation threshold velocity (V50)."""
     try:
-        return predict_v50_service(input_data)
+        res = predict_v50_service(input_data)
+        record_backend_history("V50", input_data.model_dump(), res)
+        return res
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -151,4 +176,16 @@ def simulate_trajectory(input_data: SimulationRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Simulation calculation error: {str(e)}"
         )
+
+# 12. History Endpoints
+@app.get("/api/history")
+def get_history():
+    """GET /api/history - Returns list of past prediction executions with inputs and readings."""
+    return prediction_history_db
+
+@app.delete("/api/history")
+def clear_history():
+    """DELETE /api/history - Clears the prediction history log."""
+    prediction_history_db.clear()
+    return {"status": "cleared", "count": 0}
 

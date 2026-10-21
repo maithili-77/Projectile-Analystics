@@ -4,6 +4,7 @@ import { AcademicDisclaimer } from '../components/AcademicDisclaimer';
 import { TrajectoryChart } from '../charts/TrajectoryChart';
 import { api } from '../services/api';
 import { TrajectoryInput, PredictionResult, SimulationResponse } from '../types';
+import { savePredictionToHistory } from '../utils/history';
 
 export const TrajectoryPage: React.FC = () => {
   const [input, setInput] = useState<TrajectoryInput>({
@@ -34,6 +35,18 @@ export const TrajectoryPage: React.FC = () => {
         num_points: 100,
       });
       setSimulation(simRes);
+
+      if (predRes) {
+        savePredictionToHistory({
+          type: 'Trajectory',
+          model_name: predRes.model_name,
+          domain_score: predRes.domain_score,
+          domain_coverage_explanation: predRes.domain_coverage_explanation,
+          source_page: 'Trajectory Prediction Engine',
+          input: { ...input },
+          output: predRes.prediction
+        });
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to generate trajectory prediction');
     } finally {

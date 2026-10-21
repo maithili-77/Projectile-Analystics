@@ -33,6 +33,7 @@ import {
   SimulationRequest,
   SimulationResponse
 } from '../types';
+import { savePredictionToHistory } from '../utils/history';
 
 export type DatasetMode = 'trajectory' | 'performance' | 'v50';
 
@@ -81,13 +82,15 @@ export const SimulatorPage: React.FC = () => {
   // Trajectory Canvas View toggle (2D / 3D)
   const [activeView, setActiveView] = useState<'2d' | '3d'>('2d');
 
+  // Explicit user trigger timestamp for Trajectory animation (stable at 0 until user runs model)
+  const [trajRunTrigger, setTrajRunTrigger] = useState<number>(0);
   // Explicit user trigger timestamp for V50 animation (stable at 0 until user runs model)
   const [v50RunTrigger, setV50RunTrigger] = useState<number>(0);
   // Explicit user trigger timestamp for Velocity animation (stable at 0 until user runs model)
   const [perfRunTrigger, setPerfRunTrigger] = useState<number>(0);
 
   // Primary Predict Handler
-  const handlePredict = async () => {
+  const handlePredict = async (saveHistory: boolean = false) => {
     setLoading(true);
     setError(null);
 
@@ -103,8 +106,8 @@ export const SimulatorPage: React.FC = () => {
           velocity: Number(trajVelocity),
           angle_deg: Number(trajAngleDeg),
           gravity: Number(trajGravity),
-          mass_kg: 0.01,
-          drag_coeff: 0.47,
+          mass_kg: 1.0,
+          drag_coeff: 0.0,
           num_points: 100
         };
 
@@ -115,6 +118,22 @@ export const SimulatorPage: React.FC = () => {
 
         setPrediction(predRes);
         setSimulationRes(simData);
+
+        if (saveHistory && predRes) {
+          savePredictionToHistory({
+            type: 'Trajectory',
+            model_name: predRes.model_name,
+            domain_score: predRes.domain_score,
+            domain_coverage_explanation: predRes.domain_coverage_explanation,
+            source_page: 'Interactive Multi-Domain Simulator',
+            input: {
+              velocity: Number(trajVelocity),
+              angle_deg: Number(trajAngleDeg),
+              gravity: Number(trajGravity)
+            },
+            output: predRes.prediction
+          });
+        }
 
       } else if (selectedDataset === 'performance') {
         const inputData: PerformanceInput = {
@@ -128,6 +147,25 @@ export const SimulatorPage: React.FC = () => {
 
         const predRes = await api.predictPerformance(inputData);
         setPrediction(predRes);
+
+        if (saveHistory && predRes) {
+          savePredictionToHistory({
+            type: 'Performance',
+            model_name: predRes.model_name,
+            domain_score: predRes.domain_score,
+            domain_coverage_explanation: predRes.domain_coverage_explanation,
+            source_page: 'Interactive Multi-Domain Simulator',
+            input: {
+              Cartridge: perfCartridge,
+              Type: perfType,
+              Weight: Number(perfWeight),
+              BC: Number(perfBC),
+              V0: Number(perfV0),
+              targets: perfTargets
+            },
+            output: predRes.prediction
+          });
+        }
 
       } else if (selectedDataset === 'v50') {
         const inputData: V50Input = {
@@ -151,6 +189,18 @@ export const SimulatorPage: React.FC = () => {
 
         const predRes = await api.predictV50(inputData);
         setPrediction(predRes);
+
+        if (saveHistory && predRes) {
+          savePredictionToHistory({
+            type: 'V50',
+            model_name: predRes.model_name,
+            domain_score: predRes.domain_score,
+            domain_coverage_explanation: predRes.domain_coverage_explanation,
+            source_page: 'Interactive Multi-Domain Simulator',
+            input: inputData,
+            output: predRes.prediction
+          });
+        }
       }
 
       setPredictionStatus('NEWLY PREDICTED');
@@ -164,7 +214,7 @@ export const SimulatorPage: React.FC = () => {
 
   // Run initial prediction on dataset tab change
   useEffect(() => {
-    handlePredict();
+    handlePredict(false);
   }, [selectedDataset]);
 
   // Mark status as previous when inputs are adjusted
@@ -172,21 +222,25 @@ export const SimulatorPage: React.FC = () => {
     if (predictionStatus === 'NEWLY PREDICTED') {
       setPredictionStatus('PREVIOUS PREDICTION');
     }
-    if (selectedDataset === 'v50') {
+    if (selectedDataset === 'trajectory') {
+      setTrajRunTrigger(0);
+    } else if (selectedDataset === 'v50') {
       setV50RunTrigger(0);
     } else if (selectedDataset === 'performance') {
       setPerfRunTrigger(0);
     }
   };
 
-  // User-initiated model run (activates V50 / Velocity animation on demand)
+  // User-initiated model run (activates Trajectory / V50 / Velocity animation on demand & records to history)
   const handleUserRunModel = () => {
-    if (selectedDataset === 'v50') {
+    if (selectedDataset === 'trajectory') {
+      setTrajRunTrigger(Date.now());
+    } else if (selectedDataset === 'v50') {
       setV50RunTrigger(Date.now());
     } else if (selectedDataset === 'performance') {
       setPerfRunTrigger(Date.now());
     }
-    handlePredict();
+    handlePredict(true);
   };
 
   const domainScorePct = prediction ? Math.round(prediction.domain_score * 100) : 100;
@@ -639,16 +693,21 @@ export const SimulatorPage: React.FC = () => {
                     gravity={trajGravity}
                     predictedRange={prediction?.prediction?.range_actual}
                     predictedHeight={prediction?.prediction?.max_height_actual}
-                    onFire={handlePredict}
+                    onFire={handleUserRunModel}
                     loading={loading}
+                    runTrigger={trajRunTrigger}
                   />
                 ) : (
                   <Trajectory3DCanvas
                     points={simulationRes?.points || []}
                     maxRange={prediction?.prediction?.range_actual || simulationRes?.max_range || 1000}
                     maxHeight={prediction?.prediction?.max_height_actual || simulationRes?.max_height || 500}
+                    velocity={trajVelocity}
                     angleDeg={trajAngleDeg}
+                    gravity={trajGravity}
                     predictedRange={prediction?.prediction?.range_actual}
+                    predictedHeight={prediction?.prediction?.max_height_actual}
+                    runTrigger={trajRunTrigger}
                   />
                 )}
               </div>

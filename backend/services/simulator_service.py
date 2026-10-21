@@ -20,7 +20,9 @@ def run_simulation(req: SimulationRequest) -> SimulationResponse:
     radius = (3.0 * m / (4.0 * math.pi * 7850.0)) ** (1.0 / 3.0)
     area = math.pi * (radius ** 2)
     
-    dt = 0.05
+    # Adaptive time step based on estimated flight time so trajectory integrates fully
+    est_total_time = (2.0 * v0 * math.sin(angle_rad) / g) if (g > 0 and math.sin(angle_rad) > 0) else 10.0
+    dt = max(0.005, min(0.2, est_total_time / 300.0))
     t = 0.0
     x = 0.0
     y = 0.0
@@ -31,12 +33,13 @@ def run_simulation(req: SimulationRequest) -> SimulationResponse:
     max_height = 0.0
     apex_time = 0.0
     
-    while y >= 0.0 and len(points) < req.num_points * 5:
+    # Run integration until projectile touches down (y <= 0 after initial launch) or max safety limit
+    while (len(points) < 2 or y >= 0.0) and len(points) < 10000:
         speed = math.sqrt(vx**2 + vy**2)
         points.append(TrajectoryPoint(
             t=round(t, 3),
             x=round(x, 2),
-            y=round(y, 2),
+            y=round(max(0.0, y), 2),
             vx=round(vx, 2),
             vy=round(vy, 2),
             v=round(speed, 2)
@@ -46,10 +49,14 @@ def run_simulation(req: SimulationRequest) -> SimulationResponse:
             max_height = y
             apex_time = t
             
-        # Aerodynamic drag forces
-        Fd = 0.5 * rho * (speed ** 2) * Cd * area
-        ax = -(Fd / m) * (vx / speed) if speed > 0 else 0
-        ay = -g - ((Fd / m) * (vy / speed)) if speed > 0 else -g
+        # Aerodynamic drag forces (if Cd > 0)
+        if Cd > 0 and speed > 0:
+            Fd = 0.5 * rho * (speed ** 2) * Cd * area
+            ax = -(Fd / m) * (vx / speed)
+            ay = -g - ((Fd / m) * (vy / speed))
+        else:
+            ax = 0.0
+            ay = -g
         
         # Euler numerical integration step
         x += vx * dt + 0.5 * ax * (dt ** 2)

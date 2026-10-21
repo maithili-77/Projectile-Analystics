@@ -1,165 +1,777 @@
-import React, { useEffect, useState } from 'react';
-import { History, Download, Trash2, RefreshCw, Eye } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import {
+  History,
+  Download,
+  Trash2,
+  RefreshCw,
+  Eye,
+  TrendingUp,
+  Zap,
+  ShieldCheck,
+  Filter,
+  Search,
+  ArrowUpRight,
+  CheckCircle2,
+  AlertTriangle,
+  Layers,
+  Calendar,
+  Clock,
+  Sliders,
+  Activity,
+  PlayCircle,
+  Sparkles,
+  FileJson,
+  FileSpreadsheet,
+  ChevronDown,
+  ChevronUp,
+  Compass,
+  Gauge,
+  Target
+} from 'lucide-react';
 import { AcademicDisclaimer } from '../components/AcademicDisclaimer';
-import { ModelDomainMonitor } from '../components/ModelDomainMonitor';
+import { exportToJSON, exportToCSV } from '../utils/export';
 import { api } from '../services/api';
-import { exportToJSON } from '../utils/export';
+import {
+  getPredictionHistory,
+  deletePredictionHistoryItem,
+  clearPredictionHistory,
+  loadSamplePredictionHistory,
+  HISTORY_STORAGE_KEY
+} from '../utils/history';
 import { PredictionHistoryItem } from '../types';
+import { PageId } from '../components/Sidebar';
 
-export const HistoryPage: React.FC = () => {
+interface Props {
+  setActivePage?: (page: PageId) => void;
+}
+
+export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
   const [history, setHistory] = useState<PredictionHistoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedItem, setSelectedItem] = useState<PredictionHistoryItem | null>(null);
+  const [filterType, setFilterType] = useState<'ALL' | 'Trajectory' | 'Performance' | 'V50'>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [expandedRawPayloads, setExpandedRawPayloads] = useState<Record<string, boolean>>({});
 
-  const loadHistory = () => {
+  const loadHistory = async () => {
     setLoading(true);
-    // Load from browser localStorage
-    const local = JSON.parse(localStorage.getItem('prediction_history') || '[]');
-    setHistory(local);
-    setLoading(false);
+    const local = getPredictionHistory();
+    if (local.length > 0) {
+      setHistory(local);
+      setLoading(false);
+      return;
+    }
+
+    // If local storage is empty, check backend session history
+    try {
+      const remote = await api.getHistory();
+      if (remote && Array.isArray(remote) && remote.length > 0) {
+        setHistory(remote);
+        try {
+          localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(remote));
+        } catch {}
+      } else {
+        setHistory([]);
+      }
+    } catch {
+      setHistory([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadHistory();
+
+    // Listen to real-time updates from other tabs / simulator runs
+    const handleUpdate = () => {
+      loadHistory();
+    };
+    window.addEventListener('prediction_history_updated', handleUpdate);
+    return () => window.removeEventListener('prediction_history_updated', handleUpdate);
   }, []);
 
-  const handleClearAll = () => {
-    if (confirm('Clear all saved prediction history?')) {
-      localStorage.removeItem('prediction_history');
+  const handleClearAll = async () => {
+    if (confirm('Clear all saved prediction history logs?')) {
+      clearPredictionHistory();
+      try {
+        await api.clearHistory();
+      } catch {}
       setHistory([]);
     }
   };
 
-  const handleDeleteItem = (idx: number) => {
-    const updated = history.filter((_, i) => i !== idx);
-    localStorage.setItem('prediction_history', JSON.stringify(updated));
+  const handleDeleteItem = (idOrIdx: string | number) => {
+    const updated = deletePredictionHistoryItem(idOrIdx);
     setHistory(updated);
   };
 
-  const handleExportJSON = () => {
-    exportToJSON(history, `prediction_history_${new Date().toISOString().slice(0, 10)}`);
+  const handleLoadSamples = () => {
+    const samples = loadSamplePredictionHistory();
+    setHistory(samples);
   };
 
+  const handleExportJSON = () => {
+    exportToJSON(
+      history,
+      `ballistics_prediction_history_${new Date().toISOString().slice(0, 10)}`
+    );
+  };
+
+  const handleExportCSV = () => {
+    if (history.length === 0) return;
+    const flatRecords = history.map(item => ({
+      ID: item.id || '',
+      Domain_Type: item.type,
+      Timestamp: item.timestamp,
+      Model_Name: item.model_name || '',
+      Domain_Score: item.domain_score ?? 1.0,
+      Source_Surface: item.source_page || '',
+      User_Inputs: JSON.stringify(item.input),
+      Model_Readings: JSON.stringify(item.output)
+    }));
+    exportToCSV(
+      flatRecords,
+      `ballistics_prediction_history_${new Date().toISOString().slice(0, 10)}`
+    );
+  };
+
+  const toggleRawPayload = (id: string) => {
+    setExpandedRawPayloads(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
+  // Filter and search logic
+  const filteredHistory = useMemo(() => {
+    return history.filter(item => {
+      const itemType = (item.type || '').toLowerCase();
+      const matchesType =
+        filterType === 'ALL' || itemType === filterType.toLowerCase();
+      if (!matchesType) return false;
+
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      const inputStr = JSON.stringify(item.input || {}).toLowerCase();
+      const outputStr = JSON.stringify(item.output || {}).toLowerCase();
+      const modelStr = (item.model_name || '').toLowerCase();
+      const sourceStr = (item.source_page || '').toLowerCase();
+
+      return (
+        inputStr.includes(q) ||
+        outputStr.includes(q) ||
+        modelStr.includes(q) ||
+        sourceStr.includes(q) ||
+        itemType.includes(q)
+      );
+    });
+  }, [history, filterType, searchQuery]);
+
+  // Aggregate stats
+  const stats = useMemo(() => {
+    const total = history.length;
+    const trajCount = history.filter(h => (h.type || '').toLowerCase() === 'trajectory').length;
+    const perfCount = history.filter(h => (h.type || '').toLowerCase() === 'performance').length;
+    const v50Count = history.filter(h => (h.type || '').toLowerCase() === 'v50').length;
+    const avgScore = total > 0
+      ? Math.round(
+          (history.reduce((acc, h) => acc + (h.domain_score !== undefined ? h.domain_score : 1.0), 0) /
+            total) *
+            100
+        )
+      : 100;
+
+    return { total, trajCount, perfCount, v50Count, avgScore };
+  }, [history]);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-12 font-sans">
       <AcademicDisclaimer />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <History className="w-5 h-5 text-indigo-400" />
-            <span>PREDICTION HISTORY LOG</span>
-          </h1>
-          <p className="text-xs text-slate-400 font-mono">
-            Persisted browser session logs with Model Domain Monitoring
-          </p>
+      {/* Main Page Header */}
+      <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4 bg-grid-pattern">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-100 flex items-center gap-2.5">
+              <History className="w-6 h-6 text-indigo-400" />
+              <span>PREDICTION & SIMULATION AUDIT HISTORY</span>
+            </h1>
+            <p className="text-xs text-slate-300 font-mono mt-1">
+              Complete chronological audit logs of all user-executed machine learning runs, model input configurations, and ballistic readings.
+            </p>
+          </div>
+
+          {/* Action Toolbar */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportJSON}
+              disabled={history.length === 0}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-40"
+              title="Download history as JSON file"
+            >
+              <FileJson className="w-3.5 h-3.5" />
+              <span>Export JSON</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              disabled={history.length === 0}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-slate-700 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-40"
+              title="Download history as CSV spreadsheet"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Export CSV</span>
+            </button>
+
+            {history.length === 0 && (
+              <button
+                type="button"
+                onClick={handleLoadSamples}
+                className="px-3 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Load Sample Logs</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleClearAll}
+              disabled={history.length === 0}
+              className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-40"
+              title="Clear all saved history"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear History</span>
+            </button>
+
+            {setActivePage && (
+              <button
+                type="button"
+                onClick={() => setActivePage('simulator')}
+                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white text-xs font-bold font-sans flex items-center gap-1.5 shadow-glow-cyan transition-all cursor-pointer ml-auto sm:ml-0"
+              >
+                <PlayCircle className="w-3.5 h-3.5" />
+                <span>Run Simulator</span>
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleExportJSON}
-            disabled={history.length === 0}
-            className="px-3.5 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-xs font-mono flex items-center gap-1.5 transition-colors disabled:opacity-50"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export JSON</span>
-          </button>
-          <button
-            onClick={handleClearAll}
-            disabled={history.length === 0}
-            className="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-mono flex items-center gap-1.5 transition-colors disabled:opacity-50"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Clear All</span>
-          </button>
+        {/* Aggregate Stats Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between">
+            <span className="text-[10px] text-slate-400 font-mono uppercase font-bold">Total Runs</span>
+            <span className="text-xl font-extrabold text-slate-100 font-mono mt-1">{stats.total}</span>
+          </div>
+
+          <div className="p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/20 flex flex-col justify-between">
+            <span className="text-[10px] text-cyan-400 font-mono uppercase font-bold flex items-center gap-1">
+              <TrendingUp className="w-3 h-3" /> Trajectory
+            </span>
+            <span className="text-xl font-extrabold text-cyan-300 font-mono mt-1">{stats.trajCount}</span>
+          </div>
+
+          <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex flex-col justify-between">
+            <span className="text-[10px] text-emerald-400 font-mono uppercase font-bold flex items-center gap-1">
+              <Zap className="w-3 h-3" /> Performance
+            </span>
+            <span className="text-xl font-extrabold text-emerald-300 font-mono mt-1">{stats.perfCount}</span>
+          </div>
+
+          <div className="p-3 rounded-xl bg-purple-500/5 border border-purple-500/20 flex flex-col justify-between">
+            <span className="text-[10px] text-purple-400 font-mono uppercase font-bold flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3" /> V50 Armor
+            </span>
+            <span className="text-xl font-extrabold text-purple-300 font-mono mt-1">{stats.v50Count}</span>
+          </div>
+        </div>
+
+        {/* Filter Tabs & Search Bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800 text-xs font-mono overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setFilterType('ALL')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                filterType === 'ALL'
+                  ? 'bg-slate-800 text-slate-100 font-bold border border-slate-700'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              All Runs ({stats.total})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFilterType('Trajectory')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                filterType === 'Trajectory'
+                  ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/40'
+                  : 'text-slate-400 hover:text-cyan-300'
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>Trajectory ({stats.trajCount})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFilterType('Performance')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                filterType === 'Performance'
+                  ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40'
+                  : 'text-slate-400 hover:text-emerald-300'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>Performance ({stats.perfCount})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFilterType('V50')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                filterType === 'V50'
+                  ? 'bg-purple-500/20 text-purple-300 font-bold border border-purple-500/40'
+                  : 'text-slate-400 hover:text-purple-300'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>V50 Armor ({stats.v50Count})</span>
+            </button>
+          </div>
+
+          {/* Search Box */}
+          <div className="relative flex-1 max-w-xs">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search inputs, readings, models..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 text-xs font-mono focus:border-cyan-500/60 focus:outline-none"
+            />
+          </div>
         </div>
       </div>
 
+      {/* Main Content Area */}
       {loading ? (
-        <div className="py-16 text-center text-slate-400 font-mono text-xs flex items-center justify-center gap-2">
-          <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
-          <span>Fetching prediction history...</span>
+        <div className="py-20 text-center text-slate-400 font-mono text-xs flex items-center justify-center gap-2">
+          <RefreshCw className="w-5 h-5 animate-spin text-cyan-400" />
+          <span>Loading prediction audit history...</span>
         </div>
-      ) : history.length > 0 ? (
+      ) : filteredHistory.length > 0 ? (
         <div className="space-y-4">
-          {history.map((item, idx) => (
-            <div key={idx} className="glass-card p-5 rounded-2xl border border-slate-800 space-y-4 font-mono text-xs">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold uppercase text-[10px]">
-                    {item.type}
-                  </span>
-                  <span className="text-slate-500 text-[11px]">{new Date(item.timestamp).toLocaleString()}</span>
+          {filteredHistory.map((item, idx) => {
+            const itemId = item.id || `hist_${idx}`;
+            const isRawExpanded = !!expandedRawPayloads[itemId];
+            const domainType = (item.type || '').toLowerCase();
+            const isTrajectory = domainType === 'trajectory';
+            const isPerformance = domainType === 'performance';
+            const isV50 = domainType === 'v50';
+
+            const badgeColor = isTrajectory
+              ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
+              : isPerformance
+              ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+              : 'bg-purple-500/10 text-purple-300 border-purple-500/30';
+
+            const borderHighlight = isTrajectory
+              ? 'hover:border-cyan-500/40'
+              : isPerformance
+              ? 'hover:border-emerald-500/40'
+              : 'hover:border-purple-500/40';
+
+            return (
+              <div
+                key={itemId}
+                className={`glass-panel p-5 rounded-2xl border border-slate-800/90 shadow-xl space-y-4 transition-all duration-200 ${borderHighlight}`}
+              >
+                {/* Header Row: Domain Badge, Timestamp, Execution Surface, Action Controls */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className={`px-2.5 py-1 rounded-lg border text-xs font-mono font-bold uppercase flex items-center gap-1.5 ${badgeColor}`}>
+                      {isTrajectory ? <TrendingUp className="w-3.5 h-3.5" /> : isPerformance ? <Zap className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                      <span>{item.type} Prediction</span>
+                    </span>
+
+                    <span className="text-slate-400 text-xs font-mono flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-slate-500" />
+                      <span>{new Date(item.timestamp).toLocaleString()}</span>
+                    </span>
+
+                    {item.source_page && (
+                      <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800 text-[10px] font-mono">
+                        Source: {item.source_page}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedItem(item)}
+                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 text-xs font-mono flex items-center gap-1 transition-all"
+                      title="Inspect Full Detail View"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Inspect</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteItem(item.id || idx)}
+                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-rose-400 border border-slate-700 text-xs font-mono flex items-center gap-1 transition-all"
+                      title="Delete this entry"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setSelectedItem(item)}
-                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300"
-                    title="View Details"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteItem(idx)}
-                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-rose-400"
-                    title="Delete Item"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                {/* Two-Column Structured Presentation: User Inputs vs Model Readings */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+                  
+                  {/* LEFT: Complete User Inputs */}
+                  <div className="lg:col-span-5 p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between border-b border-slate-800/80 pb-2 mb-3">
+                        <span className="text-xs font-bold text-slate-200 uppercase font-mono tracking-wider flex items-center gap-1.5">
+                          <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Complete Model User Inputs</span>
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-500">Configured by User</span>
+                      </div>
+
+                      {/* Domain A: Trajectory User Inputs */}
+                      {isTrajectory && (
+                        <div className="space-y-2 font-mono text-xs">
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/70 border border-slate-900">
+                            <span className="text-slate-400">Initial Velocity (v0):</span>
+                            <span className="font-bold text-cyan-300">{item.input?.velocity} m/s</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/70 border border-slate-900">
+                            <span className="text-slate-400">Launch Angle (θ):</span>
+                            <span className="font-bold text-cyan-300">{item.input?.angle_deg}°</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/70 border border-slate-900">
+                            <span className="text-slate-400">Gravity Acceleration (g):</span>
+                            <span className="font-bold text-cyan-300">{item.input?.gravity} m/s²</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Domain B: Performance User Inputs */}
+                      {isPerformance && (
+                        <div className="space-y-2 font-mono text-xs">
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/70 border border-slate-900">
+                            <span className="text-slate-400">Cartridge Designation:</span>
+                            <span className="font-bold text-emerald-300">{item.input?.Cartridge || '.308 WINCHESTER'}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-900 flex justify-between">
+                              <span className="text-slate-400">Category:</span>
+                              <span className="text-slate-200 font-bold">{item.input?.Type || 'Rifle'}</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-900 flex justify-between">
+                              <span className="text-slate-400">Weight:</span>
+                              <span className="text-slate-200 font-bold">{item.input?.Weight} gr</span>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-900 flex justify-between">
+                              <span className="text-slate-400">Ballistic Coeff:</span>
+                              <span className="text-slate-200 font-bold">{item.input?.BC}</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-900 flex justify-between">
+                              <span className="text-slate-400">Muzzle V0:</span>
+                              <span className="text-emerald-300 font-bold">{item.input?.V0} fps</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Domain C: V50 User Inputs */}
+                      {isV50 && (
+                        <div className="space-y-2 font-mono text-xs">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-900 flex justify-between">
+                              <span className="text-slate-400">Projectile Type:</span>
+                              <span className="font-bold text-purple-300">{item.input?.proj_type || 'AP'}</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-900 flex justify-between">
+                              <span className="text-slate-400">Calibre:</span>
+                              <span className="font-bold text-slate-200">{item.input?.calibre} mm</span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-900 flex justify-between">
+                              <span className="text-slate-400">Target Material:</span>
+                              <span className="font-bold text-slate-200">{item.input?.Material || 'Steel'}</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-900 flex justify-between">
+                              <span className="text-slate-400">Thickness:</span>
+                              <span className="font-bold text-purple-300">{item.input?.thickness} mm</span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+                            <div className="p-1.5 rounded-lg bg-slate-950/70 border border-slate-900">
+                              <div className="text-slate-500 text-[9px]">Yield Strength</div>
+                              <div className="text-slate-200 font-bold">{item.input?.yield} MPa</div>
+                            </div>
+                            <div className="p-1.5 rounded-lg bg-slate-950/70 border border-slate-900">
+                              <div className="text-slate-500 text-[9px]">Hardness</div>
+                              <div className="text-slate-200 font-bold">{item.input?.hardness} HB</div>
+                            </div>
+                            <div className="p-1.5 rounded-lg bg-slate-950/70 border border-slate-900">
+                              <div className="text-slate-500 text-[9px]">Obliquity Angle</div>
+                              <div className="text-slate-200 font-bold">{item.input?.angle}°</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="text-[10px] text-slate-500 font-mono pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                      <span>Parameters Verified</span>
+                      <span className="text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Valid Schema
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* RIGHT: Model Readings & Predictions */}
+                  <div className="lg:col-span-7 p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between border-b border-slate-800/80 pb-2 mb-3">
+                        <span className="text-xs font-bold text-slate-200 uppercase font-mono tracking-wider flex items-center gap-1.5">
+                          <Gauge className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Generated Model Readings & Predictions</span>
+                        </span>
+                        <span className="text-[10px] font-mono text-cyan-400 font-bold">Inference Output</span>
+                      </div>
+
+                      {/* Domain A: Trajectory Readings */}
+                      {isTrajectory && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex flex-col justify-between space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono uppercase font-bold text-cyan-300">Predicted Downrange Range</span>
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-200">range_actual</span>
+                            </div>
+                            <div className="text-2xl font-extrabold text-cyan-300 font-mono">
+                              {(item.output?.range_actual || 0).toLocaleString()} m
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono">
+                              ≈ {((item.output?.range_actual || 0) / 1000).toFixed(2)} kilometers downrange
+                            </div>
+                          </div>
+
+                          <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex flex-col justify-between space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono uppercase font-bold text-indigo-300">Predicted Max Apex Height</span>
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200">max_height_actual</span>
+                            </div>
+                            <div className="text-2xl font-extrabold text-indigo-300 font-mono">
+                              {(item.output?.max_height_actual || 0).toLocaleString()} m
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono">
+                              ≈ {((item.output?.max_height_actual || 0) / 1000).toFixed(2)} kilometers altitude
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Domain B: Performance Readings */}
+                      {isPerformance && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                          {[
+                            { key: 'V100', label: 'Velocity @ 100y', unit: 'fps', color: 'text-cyan-300', bg: 'bg-cyan-500/10 border-cyan-500/30' },
+                            { key: 'V200', label: 'Velocity @ 200y', unit: 'fps', color: 'text-cyan-300', bg: 'bg-cyan-500/10 border-cyan-500/30' },
+                            { key: 'E100', label: 'Energy @ 100y', unit: 'ft·lbs', color: 'text-emerald-300', bg: 'bg-emerald-500/10 border-emerald-500/30' },
+                            { key: 'E200', label: 'Energy @ 200y', unit: 'ft·lbs', color: 'text-emerald-300', bg: 'bg-emerald-500/10 border-emerald-500/30' },
+                            { key: 'BD100', label: 'Bullet Drop @ 100y', unit: 'in', color: 'text-purple-300', bg: 'bg-purple-500/10 border-purple-500/30' },
+                            { key: 'BD200', label: 'Bullet Drop @ 200y', unit: 'in', color: 'text-purple-300', bg: 'bg-purple-500/10 border-purple-500/30' }
+                          ].map((metric) => {
+                            const val = item.output?.[metric.key];
+                            return (
+                              <div key={metric.key} className={`p-2.5 rounded-xl border flex flex-col justify-between ${metric.bg}`}>
+                                <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                                  <span>{metric.label}</span>
+                                  <span className="text-[9px] text-slate-500">{metric.unit}</span>
+                                </div>
+                                <div className={`text-base font-extrabold font-mono mt-1 ${metric.color}`}>
+                                  {val !== undefined ? `${val} ${metric.unit}` : '---'}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Domain C: V50 Readings */}
+                      {isV50 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30 flex flex-col justify-between space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono uppercase font-bold text-purple-300">V50 Ballistic Limit Velocity</span>
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-200">v50_threshold</span>
+                            </div>
+                            <div className="text-2xl font-extrabold text-purple-300 font-mono">
+                              {(item.output?.v50 || item.output?.predicted_v50 || 0).toLocaleString()} m/s
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono">
+                              50% armor perforation velocity limit
+                            </div>
+                          </div>
+
+                          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col justify-between space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono uppercase font-bold text-amber-300">Kinetic Energy at V50</span>
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200">Ek @ V50</span>
+                            </div>
+                            <div className="text-2xl font-extrabold text-amber-300 font-mono">
+                              {Math.round(item.output?.kinetic_energy_at_v50 || 0).toLocaleString()} Joules
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono">
+                              Terminal impact kinetic energy absorption
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bottom Utility Bar on Card */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+                      <button
+                        type="button"
+                        onClick={() => toggleRawPayload(itemId)}
+                        className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
+                      >
+                        {isRawExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        <span>{isRawExpanded ? 'Hide Raw JSON Payloads' : 'Inspect Raw JSON Payloads'}</span>
+                      </button>
+
+                      <div className="text-[10px] font-mono text-slate-500">
+                        Record ID: <strong className="text-slate-400">{item.id || itemId}</strong>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
+
+                {/* Collapsible Raw JSON Payloads (Inputs & Readings) */}
+                {isRawExpanded && (
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-900 space-y-3 font-mono text-xs">
+                    <div className="text-xs font-bold text-slate-300 uppercase flex items-center gap-2">
+                      <FileJson className="w-4 h-4 text-cyan-400" />
+                      <span>Raw Machine Learning Schemas (In-Depth Telemetry)</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">Raw User Input Payload</div>
+                        <pre className="p-3 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 overflow-x-auto text-[11px]">
+                          {JSON.stringify(item.input, null, 2)}
+                        </pre>
+                      </div>
+
+                      <div>
+                        <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">Raw Model Output Readings</div>
+                        <pre className="p-3 rounded-lg bg-slate-900 border border-slate-800 text-cyan-300 overflow-x-auto text-[11px]">
+                          {JSON.stringify(item.output, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {/* Model Domain Monitor */}
-              <ModelDomainMonitor domainScore={0.92} explanation="Input domain score evaluated against dataset feature bounds." />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">Input Parameters</div>
-                  <pre className="p-3 rounded-xl bg-slate-950 border border-slate-900 text-slate-300 overflow-x-auto text-[11px]">
-                    {JSON.stringify(item.input, null, 2)}
-                  </pre>
-                </div>
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">Predictions</div>
-                  <pre className="p-3 rounded-xl bg-slate-950 border border-slate-900 text-cyan-300 overflow-x-auto text-[11px]">
-                    {JSON.stringify(item.output, null, 2)}
-                  </pre>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
-        <div className="glass-card p-16 rounded-2xl border border-slate-800 text-center space-y-2 font-mono">
-          <History className="w-12 h-12 text-slate-600 mx-auto" />
-          <h3 className="text-sm font-bold text-slate-300">No predictions logged in session</h3>
-          <p className="text-xs text-slate-500">
-            Execute predictions in Prediction Lab or Simulator and click Save to log items here.
+        /* Empty State */
+        <div className="glass-panel p-16 rounded-2xl border border-slate-800 text-center space-y-4 font-mono max-w-2xl mx-auto">
+          <History className="w-14 h-14 text-slate-600 mx-auto animate-pulse" />
+          <h3 className="text-base font-bold text-slate-200">No Model Executions Recorded Yet</h3>
+          <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+            Run a prediction in the <strong>Interactive Simulator</strong>, <strong>Trajectory Engine</strong>, or <strong>V50 Armor Lab</strong>. All user inputs and model readings are automatically recorded here in real-time.
           </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            {setActivePage && (
+              <button
+                type="button"
+                onClick={() => setActivePage('simulator')}
+                className="py-2.5 px-5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white text-xs font-bold shadow-glow-cyan flex items-center gap-2 font-sans uppercase tracking-wider transition-all cursor-pointer"
+              >
+                <PlayCircle className="w-4 h-4" />
+                <span>Launch Interactive Simulator</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleLoadSamples}
+              className="py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-mono flex items-center gap-2 transition-all cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 text-indigo-400" />
+              <span>Load Sample History Runs</span>
+            </button>
+          </div>
         </div>
       )}
 
       {/* Item Detail Modal */}
       {selectedItem && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-card p-6 rounded-2xl border border-slate-800 max-w-xl w-full space-y-4 font-mono text-xs">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <h3 className="text-sm font-bold text-cyan-300">{selectedItem.type} Log Details</h3>
-              <button onClick={() => setSelectedItem(null)} className="text-slate-400 hover:text-white">✕</button>
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-card p-6 rounded-2xl border border-slate-800 max-w-2xl w-full space-y-4 font-mono text-xs max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-1 rounded bg-cyan-500/20 text-cyan-300 font-bold uppercase text-[11px] border border-cyan-500/40">
+                  {selectedItem.type} Audit Inspection
+                </span>
+                <span className="text-slate-400 text-xs">{new Date(selectedItem.timestamp).toLocaleString()}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedItem(null)}
+                className="text-slate-400 hover:text-white text-base p-1"
+              >
+                ✕
+              </button>
             </div>
-            <div>
-              <span className="text-[10px] text-slate-500">TIMESTAMP</span>
-              <div className="text-slate-200">{new Date(selectedItem.timestamp).toString()}</div>
-            </div>
+
             <div className="space-y-2">
-              <span className="text-[10px] text-slate-500 uppercase">Input Payload</span>
-              <pre className="p-3 rounded-lg bg-slate-950 text-slate-300 overflow-x-auto">{JSON.stringify(selectedItem.input, null, 2)}</pre>
+              <div className="text-[10px] text-slate-400 uppercase font-bold">User Input Parameters</div>
+              <pre className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 overflow-x-auto text-[11px]">
+                {JSON.stringify(selectedItem.input, null, 2)}
+              </pre>
             </div>
+
             <div className="space-y-2">
-              <span className="text-[10px] text-slate-500 uppercase">Prediction Output</span>
-              <pre className="p-3 rounded-lg bg-slate-950 text-cyan-300 overflow-x-auto">{JSON.stringify(selectedItem.output, null, 2)}</pre>
+              <div className="text-[10px] text-slate-400 uppercase font-bold">Model Output Readings</div>
+              <pre className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-cyan-300 overflow-x-auto text-[11px]">
+                {JSON.stringify(selectedItem.output, null, 2)}
+              </pre>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setSelectedItem(null)}
+                className="py-2 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-mono"
+              >
+                Close Audit View
+              </button>
             </div>
           </div>
         </div>

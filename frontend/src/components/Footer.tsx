@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, ShieldCheck, Code } from 'lucide-react';
+import { BookOpen, ShieldCheck } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
@@ -9,12 +9,6 @@ export const Footer: React.FC = () => {
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-cyan-400" />
             <span>Academic ML Research Platform &bull; Ballastix Analytics & Simulation</span>
-          </div>
-
-          <div className="flex items-center gap-6 font-mono text-[11px] text-slate-500">
-            <span>FastAPI + Python Backend</span>
-            <span>React + Vite + TypeScript</span>
-            <span>Scikit-Learn ML Models</span>
           </div>
 
           <div className="flex items-center gap-1 text-amber-400/90 font-medium">

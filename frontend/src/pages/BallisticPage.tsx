@@ -4,6 +4,7 @@ import { AcademicDisclaimer } from '../components/AcademicDisclaimer';
 import { VelocityEnergyChart } from '../charts/VelocityEnergyChart';
 import { api } from '../services/api';
 import { BallisticInput, PredictionResult } from '../types';
+import { savePredictionToHistory } from '../utils/history';
 
 export const BallisticPage: React.FC = () => {
   const [input, setInput] = useState<BallisticInput>({
@@ -25,6 +26,18 @@ export const BallisticPage: React.FC = () => {
     try {
       const res = await api.predictPerformance(input);
       setPrediction(res);
+
+      if (res) {
+        savePredictionToHistory({
+          type: 'Performance',
+          model_name: res.model_name,
+          domain_score: res.domain_score,
+          domain_coverage_explanation: res.domain_coverage_explanation,
+          source_page: 'Ballistic Performance Predictor',
+          input: { ...input },
+          output: res.prediction
+        });
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to predict ballistic performance');
     } finally {

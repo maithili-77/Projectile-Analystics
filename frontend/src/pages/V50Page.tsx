@@ -3,6 +3,7 @@ import { ShieldCheck, Sparkles, Layers, ShieldAlert } from 'lucide-react';
 import { AcademicDisclaimer } from '../components/AcademicDisclaimer';
 import { api } from '../services/api';
 import { V50Input, PredictionResult } from '../types';
+import { savePredictionToHistory } from '../utils/history';
 
 export const V50Page: React.FC = () => {
   const [input, setInput] = useState<V50Input>({
@@ -35,6 +36,18 @@ export const V50Page: React.FC = () => {
     try {
       const res = await api.predictV50(input);
       setPrediction(res);
+
+      if (res) {
+        savePredictionToHistory({
+          type: 'V50',
+          model_name: res.model_name,
+          domain_score: res.domain_score,
+          domain_coverage_explanation: res.domain_coverage_explanation,
+          source_page: 'Terminal Penetration V50 Predictor',
+          input: { ...input },
+          output: res.prediction
+        });
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to predict V50 limit velocity');
     } finally {
