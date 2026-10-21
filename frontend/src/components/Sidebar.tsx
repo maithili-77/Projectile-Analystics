@@ -14,7 +14,6 @@ import {
   X,
   Compass
 } from 'lucide-react';
-import { StatusBadge } from './StatusBadge';
 import { HealthStatus } from '../types';
 
 export type PageId =
@@ -147,19 +146,6 @@ export const Sidebar: React.FC<Props> = ({
           </nav>
         </div>
 
-        {/* Footer Info & System Status */}
-        <div className="p-4 border-t border-slate-800/80 space-y-3">
-          {(!isCollapsed || isOpenMobile) && (
-            <div className="w-full">
-              <StatusBadge status={health} loading={loading} />
-            </div>
-          )}
-          {(!isCollapsed || isOpenMobile) && (
-            <div className="text-[10px] text-slate-500 font-mono text-center">
-              Research & Educational Use Only
-            </div>
-          )}
-        </div>
       </aside>
     </>
   );
