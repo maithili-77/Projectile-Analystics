@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { loginUser, signupUser } from '../utils/auth';
 import { UserProfile } from '../types';
+import { GunLogo } from './GunLogo';
 
 interface Props {
   isOpen: boolean;
@@ -115,9 +116,7 @@ export const AuthModal: React.FC<Props> = ({
           <div className="p-6 sm:p-8 border-b border-slate-800 bg-gradient-to-b from-slate-800/40 to-transparent">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600 flex items-center justify-center text-white shadow-glow-cyan">
-                  <Compass className="w-6 h-6" />
-                </div>
+                <GunLogo size="lg" />
                 <div>
                   <h2 className="text-xl font-black text-slate-100 tracking-wider uppercase flex items-center gap-2">
                     <span>BALLASTIX</span>

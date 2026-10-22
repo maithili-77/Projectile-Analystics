@@ -38,10 +38,11 @@ import {
   deletePredictionHistoryItem,
   clearPredictionHistory,
   loadSamplePredictionHistory,
-  getHistoryUserAccounts
+  getHistoryUserAccounts,
+  setPredictionHistory
 } from '../utils/history';
 import { getCurrentUser } from '../utils/auth';
-import { PredictionHistoryItem } from '../types';
+import { PredictionHistoryItem, UserProfile } from '../types';
 import { PageId } from '../components/Sidebar';
 
 interface Props {
@@ -49,7 +50,9 @@ interface Props {
 }
 
 export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
-  const currentUser = getCurrentUser();
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => getCurrentUser());
+  const activeUserEmail = (currentUser?.email || 'guest@ballastix.lab').trim().toLowerCase();
+
   const [history, setHistory] = useState<PredictionHistoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedItem, setSelectedItem] = useState<PredictionHistoryItem | null>(null);
@@ -57,57 +60,23 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedRawPayloads, setExpandedRawPayloads] = useState<Record<string, boolean>>({});
 
-  // Active account email whose history is being viewed
-  const [selectedAccountEmail, setSelectedAccountEmail] = useState<string>(
-    () => currentUser?.email || 'guest@ballastix.lab'
-  );
-  const [knownAccounts, setKnownAccounts] = useState<Array<{ email: string; name: string; count: number }>>([]);
+  // Synchronize currentUser on authentication change
+  useEffect(() => {
+    const handleAuth = () => {
+      setCurrentUser(getCurrentUser());
+    };
+    window.addEventListener('ballastix_auth_changed', handleAuth);
+    return () => window.removeEventListener('ballastix_auth_changed', handleAuth);
+  }, []);
 
-  const loadHistory = async () => {
+  const loadHistory = () => {
     setLoading(true);
-    const accs = getHistoryUserAccounts();
-    setKnownAccounts(accs);
-
-    if (selectedAccountEmail === 'ALL') {
-      // Aggregate history from all local accounts
-      const allItems: PredictionHistoryItem[] = [];
-      for (const acc of accs) {
-        const userItems = getPredictionHistory(acc.email);
-        allItems.push(...userItems);
-      }
-      // Sort newest first
-      allItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      setHistory(allItems);
-      setLoading(false);
-      return;
-    }
-
-    const local = getPredictionHistory(selectedAccountEmail);
-    if (local.length > 0) {
-      setHistory(local);
-      setLoading(false);
-      return;
-    }
-
-    // Only if local storage is empty AND user hasn't deleted history, check backend session history for initial migration
-    const hasDeleted = sessionStorage.getItem('ballastix_history_user_deleted') === 'true';
-    if (!hasDeleted) {
-      try {
-        const remote = await api.getHistory();
-        if (remote && Array.isArray(remote) && remote.length > 0) {
-          const enriched = remote.map(item => ({
-            ...item,
-            user_email: item.user_email || selectedAccountEmail,
-            user_name: item.user_name || currentUser?.name || selectedAccountEmail.split('@')[0]
-          }));
-          setHistory(enriched);
-          setLoading(false);
-          return;
-        }
-      } catch {}
-    }
-
-    setHistory([]);
+    const local = getPredictionHistory(activeUserEmail);
+    // Strictly isolate: only include runs performed by this specific email
+    const isolated = local.filter(
+      item => (item.user_email || activeUserEmail).toLowerCase() === activeUserEmail
+    );
+    setHistory(isolated);
     setLoading(false);
   };
 
@@ -115,33 +84,31 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
     loadHistory();
 
     // Listen to real-time updates from other tabs / simulator runs
-    const handleUpdate = () => {
-      loadHistory();
+    const handleUpdate = (e: any) => {
+      const deletedId = e?.detail?.deletedId;
+      const targetEmail = (e?.detail?.email || '').toLowerCase();
+      // Only react if event is for this active user account
+      if (!targetEmail || targetEmail === activeUserEmail) {
+        if (deletedId) {
+          setHistory(prev => prev.filter(item => item.id !== deletedId));
+        } else {
+          loadHistory();
+        }
+      }
     };
     window.addEventListener('prediction_history_updated', handleUpdate);
-    window.addEventListener('ballastix_auth_changed', handleUpdate);
     return () => {
       window.removeEventListener('prediction_history_updated', handleUpdate);
-      window.removeEventListener('ballastix_auth_changed', handleUpdate);
     };
-  }, [selectedAccountEmail]);
+  }, [activeUserEmail]);
 
   const handleClearAll = async () => {
-    const targetLabel = selectedAccountEmail === 'ALL' ? 'all registered accounts' : selectedAccountEmail;
-    if (confirm(`Clear prediction history logs for ${targetLabel}?`)) {
-      sessionStorage.setItem('ballastix_history_user_deleted', 'true');
-      if (selectedAccountEmail === 'ALL') {
-        for (const acc of knownAccounts) {
-          clearPredictionHistory(acc.email);
-        }
-      } else {
-        clearPredictionHistory(selectedAccountEmail);
-      }
+    if (confirm(`Clear prediction history logs for ${activeUserEmail}?`)) {
+      clearPredictionHistory(activeUserEmail);
       try {
         await api.clearHistory();
       } catch {}
       setHistory([]);
-      setKnownAccounts(getHistoryUserAccounts());
     }
   };
 
@@ -149,38 +116,41 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
     const targetId = targetItem.id;
     const targetTimestamp = targetItem.timestamp;
 
-    // 1. Instantly remove from local component state for instant responsive UI
+    // 1. Instantly remove ONLY this specific clicked item from component state
     setHistory(prev => prev.filter(h => {
-      if (targetId && h.id) return h.id !== targetId;
-      if (targetTimestamp && h.timestamp) return h.timestamp !== targetTimestamp;
-      return true;
+      if (targetId) {
+        return h.id !== targetId;
+      }
+      if (targetTimestamp) {
+        return h.timestamp !== targetTimestamp;
+      }
+      return h !== targetItem;
     }));
 
-    if (selectedItem && (selectedItem.id === targetId || selectedItem.timestamp === targetTimestamp)) {
+    if (selectedItem && (selectedItem.id === targetId || (targetTimestamp && selectedItem.timestamp === targetTimestamp))) {
       setSelectedItem(null);
     }
 
-    // 2. Delete across all localStorage storages
-    deletePredictionHistoryItem(targetItem, selectedAccountEmail);
-    setKnownAccounts(getHistoryUserAccounts());
+    // 2. Delete ONLY this item from activeUserEmail storage
+    deletePredictionHistoryItem(targetItem, activeUserEmail);
 
     // 3. Delete from backend session if ID is available
     if (targetId) {
       try {
         await api.deleteHistoryItem(targetId);
-      } catch {}
+      } catch (err) {
+        console.warn('Backend item delete failed:', err);
+      }
     }
   };
 
   const handleLoadSamples = () => {
-    sessionStorage.removeItem('ballastix_history_user_deleted');
-    const samples = loadSamplePredictionHistory(selectedAccountEmail);
+    const samples = loadSamplePredictionHistory(activeUserEmail);
     setHistory(samples);
-    setKnownAccounts(getHistoryUserAccounts());
   };
 
   const handleExportJSON = () => {
-    const sanitizedEmail = selectedAccountEmail.replace(/[^a-zA-Z0-9]/g, '_');
+    const sanitizedEmail = activeUserEmail.replace(/[^a-zA-Z0-9]/g, '_');
     exportToJSON(
       history,
       `ballistics_history_${sanitizedEmail}_${new Date().toISOString().slice(0, 10)}`
@@ -193,7 +163,7 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
       ID: item.id || '',
       Domain_Type: item.type,
       Timestamp: item.timestamp,
-      Researcher_Email: item.user_email || selectedAccountEmail,
+      Researcher_Email: activeUserEmail,
       Researcher_Name: item.user_name || currentUser?.name || '',
       Model_Name: item.model_name || '',
       Domain_Score: item.domain_score ?? 1.0,
@@ -201,7 +171,7 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
       User_Inputs: JSON.stringify(item.input),
       Model_Readings: JSON.stringify(item.output)
     }));
-    const sanitizedEmail = selectedAccountEmail.replace(/[^a-zA-Z0-9]/g, '_');
+    const sanitizedEmail = activeUserEmail.replace(/[^a-zA-Z0-9]/g, '_');
     exportToCSV(
       flatRecords,
       `ballistics_history_${sanitizedEmail}_${new Date().toISOString().slice(0, 10)}`
@@ -341,38 +311,21 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
             </div>
             <div className="truncate">
               <div className="text-slate-200 font-bold flex items-center gap-2 truncate">
-                <span>Researcher Account:</span>
-                <span className="text-cyan-300 font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 truncate">
-                  {selectedAccountEmail === 'ALL' ? 'All Local Accounts Combined' : selectedAccountEmail}
+                <span>Account History:</span>
+                <span className="text-cyan-300 font-bold px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 truncate">
+                  {currentUser?.name ? `${currentUser.name} (${activeUserEmail})` : activeUserEmail}
                 </span>
               </div>
               <div className="text-[10px] text-slate-400 mt-0.5">
-                Each researcher email stores an isolated prediction & simulation history log.
+                Isolated prediction log: records are private to this account and never visible to other logins.
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-slate-400 text-[11px]">View Account:</span>
-            <select
-              value={selectedAccountEmail}
-              onChange={(e) => setSelectedAccountEmail(e.target.value)}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 text-xs font-mono focus:border-cyan-400 focus:outline-none"
-            >
-              {currentUser?.email && (
-                <option value={currentUser.email}>
-                  Active: {currentUser.name} ({currentUser.email})
-                </option>
-              )}
-              {knownAccounts
-                .filter(acc => acc.email !== currentUser?.email)
-                .map(acc => (
-                  <option key={acc.email} value={acc.email}>
-                    {acc.name} ({acc.email}) — {acc.count} runs
-                  </option>
-                ))}
-              <option value="ALL">🌐 View All Accounts Combined</option>
-            </select>
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[11px] font-mono">
+              ● {history.length} logged run{history.length === 1 ? '' : 's'}
+            </span>
           </div>
         </div>
 

@@ -77,19 +77,26 @@ export function getPredictionHistory(email?: string): PredictionHistoryItem[] {
 
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.map((item, idx) => ({
+          ...item,
+          id: item.id || `hist_${idx}_${Date.now()}`
+        }));
+      }
     }
 
     // Fallback migration: check if legacy unscoped history exists for first migration
     const legacyRaw = localStorage.getItem(LEGACY_HISTORY_STORAGE_KEY);
     if (legacyRaw && !email) {
+      localStorage.removeItem(LEGACY_HISTORY_STORAGE_KEY);
       const legacyParsed = JSON.parse(legacyRaw);
       if (Array.isArray(legacyParsed) && legacyParsed.length > 0) {
         const currentUser = getCurrentUser();
         const userEmail = currentUser?.email?.toLowerCase() || 'guest@ballastix.lab';
         const userName = currentUser?.name || 'Guest Researcher';
-        const migrated = legacyParsed.map(item => ({
+        const migrated = legacyParsed.map((item, idx) => ({
           ...item,
+          id: item.id || `migrated_${idx}_${Date.now()}`,
           user_email: item.user_email || userEmail,
           user_name: item.user_name || userName
         }));
@@ -103,6 +110,20 @@ export function getPredictionHistory(email?: string): PredictionHistoryItem[] {
   } catch (err) {
     console.error('Failed to read prediction history from localStorage:', err);
     return [];
+  }
+}
+
+/**
+ * Persist an array of history items to the specified user's storage
+ */
+export function setPredictionHistory(email: string, items: PredictionHistoryItem[]): void {
+  const cleanEmail = email.trim().toLowerCase();
+  const storageKey = getUserHistoryKey(cleanEmail);
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(items));
+    recordUserInHistoryIndex(cleanEmail);
+  } catch (err) {
+    console.error('Failed to set prediction history:', err);
   }
 }
 
@@ -181,11 +202,12 @@ export function deletePredictionHistoryItem(
     (email && email !== 'ALL' ? email : getCurrentUser()?.email || 'guest@ballastix.lab')
   ).trim().toLowerCase();
 
+  // Strict filter: deletes ONLY the single item matched by ID, timestamp, or index
   const filterItem = (item: PredictionHistoryItem, idx: number) => {
-    if (targetId && item.id) {
+    if (targetId) {
       return item.id !== targetId;
     }
-    if (targetTimestamp && item.timestamp) {
+    if (targetTimestamp) {
       return item.timestamp !== targetTimestamp;
     }
     if (targetIndex !== undefined) {
@@ -194,7 +216,7 @@ export function deletePredictionHistoryItem(
     return true;
   };
 
-  // 1. Delete from targeted email storage
+  // 1. Delete ONLY this item from targeted email storage
   const primaryKey = getUserHistoryKey(targetEmail);
   const currentItems = getPredictionHistory(targetEmail);
   const updatedPrimary = currentItems.filter(filterItem);
@@ -238,10 +260,8 @@ export function deletePredictionHistoryItem(
     }
   } catch (e) {}
 
-  // 4. Mark deletion so loadHistory does not re-fetch deleted records from backend
-  try {
-    sessionStorage.setItem('ballastix_history_user_deleted', 'true');
-  } catch {}
+  // NOTE: We do NOT set ballastix_history_user_deleted here!
+  // That flag is ONLY used when the user clicks 'Clear All'.
 
   window.dispatchEvent(new CustomEvent('prediction_history_updated', {
     detail: { email: targetEmail, deletedId: targetId }
@@ -293,7 +313,7 @@ export function loadSamplePredictionHistory(email?: string): PredictionHistoryIt
 
   const sampleItems: PredictionHistoryItem[] = [
     {
-      id: `sample_traj_${Date.now()}`,
+      id: `sample_traj_${Date.now()}_1`,
       type: 'Trajectory',
       timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
       model_name: 'Random Forest Regressor (range_model.pkl & height_model.pkl)',
@@ -313,7 +333,7 @@ export function loadSamplePredictionHistory(email?: string): PredictionHistoryIt
       }
     },
     {
-      id: `sample_perf_${Date.now()}`,
+      id: `sample_perf_${Date.now()}_2`,
       type: 'Performance',
       timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
       model_name: 'Random Forest Regressor (V100/V200 Pipeline)',
@@ -340,7 +360,7 @@ export function loadSamplePredictionHistory(email?: string): PredictionHistoryIt
       }
     },
     {
-      id: `sample_v50_${Date.now()}`,
+      id: `sample_v50_${Date.now()}_3`,
       type: 'V50',
       timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
       model_name: 'Random Forest ColumnTransformer',

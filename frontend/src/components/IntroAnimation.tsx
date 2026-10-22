@@ -65,25 +65,29 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
       animate={{ opacity: isFadingOut ? 0 : 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.5, ease: 'easeInOut' }}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#F7F5F0] p-4 sm:p-8 select-none overflow-hidden"
+      className="fixed inset-0 z-[100] w-screen h-screen flex items-center justify-center bg-black select-none overflow-hidden"
     >
-      {/* Warm light background pattern and subtle ambient glow */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-40 pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-[#FFF0E2] rounded-full blur-3xl pointer-events-none -z-10" />
+      {/* Subtle ambient tech background glow matching the UI and logo */}
+      <div className="absolute inset-0 bg-slate-950 -z-20 pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[600px] bg-orange-500/10 rounded-full blur-[140px] pointer-events-none -z-10" />
+      <div className="absolute top-1/4 left-1/3 w-[600px] h-[400px] bg-cyan-500/10 rounded-full blur-[140px] pointer-events-none -z-10" />
 
-      {/* Floating minimal Skip button */}
+      {/* Floating high-tech Skip button matching UI design */}
       <button
         onClick={handleFinish}
         id="skip-intro-btn"
-        className="absolute top-4 sm:top-6 right-4 sm:right-6 z-30 px-3.5 py-1.5 rounded-full bg-white/90 hover:bg-[#FFF9F1] border border-[#E5E1DA] hover:border-[#FF8A24] text-[#172536] hover:text-[#FF8A24] text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer backdrop-blur-sm active:scale-95"
-        title="Skip Intro (Escape)"
+        className="absolute top-4 sm:top-6 right-4 sm:right-6 z-30 px-3.5 sm:px-4 py-2 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-cyan-300 border border-slate-700/80 hover:border-cyan-500/50 text-xs font-mono font-medium shadow-xl shadow-black/60 flex items-center gap-2 transition-all cursor-pointer backdrop-blur-md active:scale-95 group"
+        title="Skip Intro (Escape or Space)"
       >
-        <span>Skip</span>
-        <X className="w-3.5 h-3.5 text-[#FF8A24]" />
+        <span className="tracking-wider">SKIP INTRO</span>
+        <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400 group-hover:text-cyan-400 border border-slate-700/80 group-hover:border-cyan-500/30">
+          ESC
+        </span>
+        <X className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-300 transition-colors" />
       </button>
 
-      {/* Fullscreen Video Pop-up Viewport - ONLY the gun video */}
-      <div className="relative w-full max-w-5xl max-h-[85vh] aspect-video rounded-2xl overflow-hidden shadow-2xl border border-[#E5E1DA] bg-black flex items-center justify-center">
+      {/* Fullscreen Video Viewport - seamless edge-to-edge */}
+      <div className="relative w-full h-full bg-black flex items-center justify-center overflow-hidden">
         <video
           ref={videoRef}
           src="/intro.mp4"
@@ -98,12 +102,15 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
         {autoplayFailed && (
           <div
             onClick={handleManualPlay}
-            className="absolute inset-0 bg-[#F7F5F0]/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center gap-3 cursor-pointer"
+            className="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center gap-4 cursor-pointer z-20"
           >
-            <div className="w-14 h-14 rounded-full bg-[#FF8A24] text-white flex items-center justify-center shadow-lg hover:scale-105 transition-transform">
-              <Play className="w-6 h-6 fill-white ml-0.5" />
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-cyan-500/30 hover:scale-105 transition-transform border border-cyan-400/40">
+              <Play className="w-7 h-7 fill-white ml-0.5" />
             </div>
-            <p className="text-xs font-bold text-[#172536]">Click to Play Intro</p>
+            <div>
+              <p className="text-sm font-bold text-slate-100 tracking-wider font-mono">INITIALIZE INTRO</p>
+              <p className="text-xs text-slate-400 font-mono mt-1">Click anywhere to play video with audio</p>
+            </div>
           </div>
         )}
       </div>

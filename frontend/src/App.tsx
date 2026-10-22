@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { AnimatePresence } from 'framer-motion';
 import { Sidebar, PageId } from './components/Sidebar';
 import { Footer } from './components/Footer';
 import { HomePage } from './pages/HomePage';
@@ -7,7 +6,6 @@ import { CalculatorPage } from './pages/CalculatorPage';
 import { SimulatorPage } from './pages/SimulatorPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { AboutPage } from './pages/AboutPage';
-import { IntroAnimation } from './components/IntroAnimation';
 import { AuthModal } from './components/AuthModal';
 import { api } from './services/api';
 import { HealthStatus, UserProfile } from './types';
@@ -20,16 +18,7 @@ export const App: React.FC = () => {
   const [isOpenMobile, setIsOpenMobile] = useState<boolean>(false);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
-  const [showIntro, setShowIntro] = useState<boolean>(() => {
-    try {
-      return !sessionStorage.getItem('ballistix_intro_seen');
-    } catch {
-      return true;
-    }
-  });
-
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => getCurrentUser());
-  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
     try {
       return sessionStorage.getItem('ballastix_guest_mode') === 'true';
@@ -37,13 +26,21 @@ export const App: React.FC = () => {
       return false;
     }
   });
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(() => {
+    const user = getCurrentUser();
+    let guest = false;
+    try {
+      guest = sessionStorage.getItem('ballastix_guest_mode') === 'true';
+    } catch {}
+    return !user && !guest;
+  });
 
-  // If intro has already been seen in this session and user is not logged in and not in guest mode, trigger auth modal on mount
+  // If user is not logged in and not in guest mode, show auth modal
   useEffect(() => {
-    if (!showIntro && !currentUser && !isGuestMode) {
+    if (!currentUser && !isGuestMode) {
       setShowAuthModal(true);
     }
-  }, [showIntro, currentUser, isGuestMode]);
+  }, [currentUser, isGuestMode]);
 
   // Synchronize authentication changes across components
   useEffect(() => {
@@ -65,14 +62,6 @@ export const App: React.FC = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  // Called immediately when gun intro video finishes or is skipped
-  const handleIntroComplete = () => {
-    setShowIntro(false);
-    if (!currentUser && !isGuestMode) {
-      setShowAuthModal(true);
-    }
-  };
-
   const handleContinueGuest = () => {
     setIsGuestMode(true);
     try {
@@ -93,12 +82,6 @@ export const App: React.FC = () => {
 
   return (
     <>
-      <AnimatePresence>
-        {showIntro && (
-          <IntroAnimation onComplete={handleIntroComplete} />
-        )}
-      </AnimatePresence>
-
       {/* Login and Signup Modal with prominent Guest option */}
       <AuthModal
         isOpen={showAuthModal}

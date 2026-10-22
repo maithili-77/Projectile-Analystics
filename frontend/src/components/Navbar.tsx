@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { HealthStatus } from '../types';
+import { GunLogo } from './GunLogo';
 
 export type TabId = 
   | 'overview'
@@ -53,9 +54,7 @@ export const Navbar: React.FC<Props> = ({ activeTab, setActiveTab, health, loadi
             onClick={() => setActiveTab('overview')}
             className="flex items-center gap-3 cursor-pointer group"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600 flex items-center justify-center shadow-glow-cyan transition-transform group-hover:scale-105">
-              <Compass className="w-5 h-5 text-white" />
-            </div>
+            <GunLogo size="md" />
             <div>
               <div className="text-sm font-bold tracking-wider text-slate-100 uppercase flex items-center gap-2">
                 <span>BALLASTIX</span>

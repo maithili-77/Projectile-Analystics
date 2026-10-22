@@ -15,9 +15,11 @@ import {
   Database,
   ShieldCheck,
   Zap,
-  Info
+  Info,
+  Compass
 } from 'lucide-react';
 import { AcademicDisclaimer } from '../components/AcademicDisclaimer';
+import { GunLogo } from '../components/GunLogo';
 import { TrajectoryCanvas2D } from '../simulator/TrajectoryCanvas2D';
 import { Trajectory3DCanvas } from '../simulator/Trajectory3DCanvas';
 import { PerformanceVisualizer } from '../simulator/PerformanceVisualizer';
@@ -299,12 +301,12 @@ export const SimulatorPage: React.FC = () => {
       <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-5 bg-grid-pattern">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
           <div>
-            <h1 className="text-xl sm:text-3xl font-extrabold text-slate-100 tracking-tight flex items-center gap-2.5">
-              <PlayCircle className="w-6 h-6 text-amber-400" />
-              <span>INTERACTIVE MULTI-DOMAIN SIMULATOR</span>
+            <h1 className="text-xl sm:text-3xl font-extrabold text-slate-100 tracking-tight flex items-center gap-3">
+              <GunLogo size="lg" />
+              <span>BALLASTIX INTERACTIVE MULTI-DOMAIN SIMULATOR</span>
             </h1>
             <p className="text-xs text-slate-300 font-mono mt-1">
-              Select an experimental dataset & machine learning domain to run live interactive simulations.
+              Select an experimental data & machine learning domain to run live interactive simulations.
             </p>
           </div>
 

@@ -17,6 +17,7 @@ import {
   LogIn
 } from 'lucide-react';
 import { HealthStatus, UserProfile } from '../types';
+import { GunLogo } from './GunLogo';
 
 export type PageId =
   | 'home'
@@ -71,9 +72,7 @@ export const Sidebar: React.FC<Props> = ({
       {/* Mobile Top Navbar with Hamburger */}
       <div className="lg:hidden sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-indigo-600 flex items-center justify-center text-white shadow-md">
-            <Compass className="w-4 h-4" />
-          </div>
+          <GunLogo size="sm" />
           <span className="text-xs font-bold tracking-wider text-slate-100 uppercase">
             BALLASTIX
           </span>
@@ -105,11 +104,9 @@ export const Sidebar: React.FC<Props> = ({
           <div className="p-5 border-b border-slate-800/80 flex items-center justify-between">
             <div
               onClick={() => handleSelect('home')}
-              className="flex items-center gap-3 cursor-pointer overflow-hidden"
+              className="flex items-center gap-3 cursor-pointer overflow-hidden group"
             >
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600 flex items-center justify-center text-white shadow-glow-cyan shrink-0">
-                <Compass className="w-5 h-5" />
-              </div>
+              <GunLogo size="md" />
               {(!isCollapsed || isOpenMobile) && (
                 <div className="truncate">
                   <div className="text-sm font-black tracking-wider text-slate-100 uppercase leading-snug">
