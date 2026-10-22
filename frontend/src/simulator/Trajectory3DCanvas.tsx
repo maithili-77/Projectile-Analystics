@@ -80,10 +80,17 @@ export const Trajectory3DCanvas: React.FC<Props> = ({
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 200000);
 
+    const v0 = Math.max(1, Number(velocity));
+    const g = Number(gravity) > 0 ? Number(gravity) : 9.81;
+    const maxPossibleRange = (v0 * v0) / g;
+    const maxPossibleHeight = (v0 * v0) / (2 * g);
+
     const effectiveSpan = Math.max(
+      maxPossibleRange,
+      maxPossibleHeight * 2,
       predictedRange || 1000,
       predictedHeight ? predictedHeight * 2 : 1000,
-      maxRange || 1000
+      1000
     );
 
     // Position camera to frame the complete trajectory
@@ -145,9 +152,9 @@ export const Trajectory3DCanvas: React.FC<Props> = ({
 
     scene.add(gunGroup);
 
-    // 5. Create 3D Target Stand at Landing Distance
+    // 5. Create 3D Target Stand at PREDICTED LANDING Distance (Moves dynamically with user inputs & ML model)
     const lastPt = effectivePoints[effectivePoints.length - 1];
-    const targetDist = predictedRange || (lastPt ? lastPt.x : effectiveSpan);
+    const targetDist = predictedRange || (lastPt ? lastPt.x : effectiveSpan * 0.85);
     const targetGroup = new THREE.Group();
     targetGroup.position.set(targetDist, 0, 0);
 
@@ -181,6 +188,14 @@ export const Trajectory3DCanvas: React.FC<Props> = ({
     targetGroup.add(bullseye);
 
     scene.add(targetGroup);
+
+    // 5B. Predicted Impact Touchdown Ring on Ground (Driven by User Input & ML Model)
+    const impactGeo = new THREE.RingGeometry(effectiveSpan * 0.015, effectiveSpan * 0.025, 24);
+    const impactMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide });
+    const impactMesh = new THREE.Mesh(impactGeo, impactMat);
+    impactMesh.rotation.x = -Math.PI / 2;
+    impactMesh.position.set(targetDist, 1.0, 0);
+    scene.add(impactMesh);
 
     // 6. Create 3D Curve from points
     const curveVectors = effectivePoints.map(pt => new THREE.Vector3(pt.x, pt.y, 0));

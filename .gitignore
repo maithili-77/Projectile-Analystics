@@ -1,5 +1,6 @@
 # Model PKL Files (Large files > 100MB)
 *.pkl
+*.bak
 
 # Node / Vite
 frontend/node_modules/

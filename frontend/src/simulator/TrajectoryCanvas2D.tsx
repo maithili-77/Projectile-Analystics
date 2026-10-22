@@ -288,7 +288,8 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
 
       // Advance bullet progress ONLY when isPlayingRef is active
       if (isPlayingRef.current) {
-        const flightDuration = 3.8;
+        const safeAngle = Math.max(1, Math.min(89, Number(angleDeg)));
+        const flightDuration = Math.max(1.8, Math.min(5.5, 1.8 + (safeAngle / 90) * 3.2));
         const normalizedSpeed = (1.0 / flightDuration) * playbackSpeedRef.current;
 
         progressRef.current += dt * normalizedSpeed;
@@ -380,8 +381,16 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     const targetDistance = (predictedRange && predictedRange > 0) ? predictedRange : theoRange;
     const targetMaxHeight = (predictedHeight && predictedHeight > 0) ? predictedHeight : theoHeight;
 
-    const effectiveMaxRange = Math.max(15, targetDistance * 1.12);
-    const effectiveMaxHeight = Math.max(10, targetMaxHeight * 1.35);
+    // Maximum theoretical physical bounds across all angles for this launch velocity (45 deg for max range, 90 deg for max height)
+    const maxPossibleRange = (v0 * v0) / g;
+    const maxPossibleHeight = (v0 * v0) / (2 * g);
+
+    // Stable coordinate reference envelope:
+    // Guarantees that as launch angle changes:
+    // - Apex height VISIBLY RISES up to the top of the canvas at high angles (70-85 deg) and stays low at shallow angles (10-25 deg)!
+    // - Landing distance VISIBLY SHIFTS downrange, reaching the far right target at 45 deg and retracting closer at steeper/shallower angles!
+    const effectiveMaxRange = Math.max(100, targetDistance * 1.08, maxPossibleRange * 1.10);
+    const effectiveMaxHeight = Math.max(50, targetMaxHeight * 1.15, maxPossibleHeight * 1.18);
 
     const scaleX = (width - padLeft - padRight) / effectiveMaxRange;
     const scaleY = (groundY - padTop) / effectiveMaxHeight;
@@ -400,16 +409,16 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     const muzzleScreenX = pivotX + muzzleTipDist * Math.cos(screenAngleRad);
     const muzzleScreenY = pivotY - muzzleTipDist * Math.sin(screenAngleRad);
 
-    // Target Stand & Bullseye placement
-    const targetSx = originX + targetDistance * scaleX;
+    // Target Stand & Bullseye placement: moves dynamically according to PREDICTED LANDING!
+    const targetSx = Math.max(muzzleScreenX + 30, originX + targetDistance * scaleX);
     const targetSy = groundY;
     const targetCenterY = targetSy - 34;
 
-    // Apex marker placement
-    const apexSx = originX + (targetDistance / 2) * scaleX;
-    const apexSy = groundY - targetMaxHeight * scaleY;
+    // Apex marker placement: dynamically computed from actual targetMaxHeight
+    const apexSx = (muzzleScreenX + targetSx) / 2;
+    const apexSy = Math.min(groundY - 14, groundY - targetMaxHeight * scaleY);
 
-    // Smooth model-driven trajectory path formula connecting muzzle to target
+    // Smooth model-driven trajectory path formula connecting muzzle directly to target bullseye
     const yMid = (muzzleScreenY + targetCenterY) / 2;
     const getXAt = (u: number) => muzzleScreenX + u * (targetSx - muzzleScreenX);
     const getYAt = (u: number) => (1 - u) * muzzleScreenY + u * targetCenterY - 4 * (yMid - apexSy) * u * (1 - u);
@@ -593,7 +602,7 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
       ctx.fillText(`at ${(targetDistance / 2000).toFixed(1)} km downrange`, apexSx, apexSy - 10);
     }
 
-    // 5. Target Stand & Bullseye at Landing Range
+    // 5A. Stationary Target Stand & Bullseye at Fixed Range Station (DOES NOT MOVE with user input)
     ctx.strokeStyle = '#64748b';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
@@ -649,23 +658,36 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     ctx.arc(targetSx, targetCenterY, targetRadius * 0.15, 0, 2 * Math.PI);
     ctx.fill();
 
-    // Target Plaque
+    // Target Plaque at Predicted Landing Distance
     ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
-    ctx.strokeStyle = '#ef4444';
+    ctx.strokeStyle = '#00f0ff';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(targetSx - 58, targetSy + 8, 116, 26, 6);
+    ctx.roundRect(targetSx - 62, targetSy + 8, 124, 28, 6);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#f87171';
-    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(`🎯 RANGE: ${Math.round(targetDistance).toLocaleString()} m`, targetSx, targetSy + 22);
+    ctx.fillText(`🎯 PREDICTED LANDING`, targetSx, targetSy + 22);
 
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '9px monospace';
-    ctx.fillText(`(${(targetDistance / 1000).toFixed(1)} km)`, targetSx, targetSy + 31);
+    ctx.fillStyle = '#a5f3fc';
+    ctx.font = 'bold 10.5px monospace';
+    ctx.fillText(`${Math.round(targetDistance).toLocaleString()} m`, targetSx, targetSy + 32);
+
+    // Glowing impact touchdown rings beneath target stand
+    const landingPulse = Math.sin(performance.now() * 0.007) * 2;
+    ctx.strokeStyle = '#00f0ff';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.ellipse(targetSx, groundY, 16 + landingPulse, 5 + landingPulse * 0.3, 0, 0, 2 * Math.PI);
+    ctx.stroke();
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.arc(targetSx, groundY, 4, 0, 2 * Math.PI);
+    ctx.fill();
 
     // 6. Artillery Cannon at Origin - Pointed at exact angle set by user
     ctx.fillStyle = '#334155';

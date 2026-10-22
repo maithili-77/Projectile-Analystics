@@ -212,22 +212,70 @@ export const SimulatorPage: React.FC = () => {
     }
   };
 
-  // Run initial prediction on dataset tab change
+  // Auto-predict reactively whenever user adjusts inputs in "Predict Range and Max Height" (Trajectory)
   useEffect(() => {
-    handlePredict(false);
+    if (selectedDataset !== 'trajectory') return;
+    const v = Number(trajVelocity);
+    const a = Number(trajAngleDeg);
+    const g = Number(trajGravity);
+
+    if (v <= 0 || a <= 0 || a >= 90 || g <= 0) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        setError(null);
+        const inputData: TrajectoryInput = {
+          velocity: v,
+          angle_deg: a,
+          gravity: g
+        };
+
+        const simReq: SimulationRequest = {
+          velocity: v,
+          angle_deg: a,
+          gravity: g,
+          mass_kg: 1.0,
+          drag_coeff: 0.0,
+          num_points: 100
+        };
+
+        const [predRes, simData] = await Promise.all([
+          api.predictTrajectory(inputData),
+          api.runSimulation(simReq).catch(() => null)
+        ]);
+
+        setPrediction(predRes);
+        setSimulationRes(simData);
+        setPredictionStatus('NEWLY PREDICTED');
+      } catch (err: any) {
+        console.error('Real-time trajectory prediction error:', err);
+      }
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [trajVelocity, trajAngleDeg, trajGravity, selectedDataset]);
+
+  // Run initial prediction on non-trajectory dataset tab change
+  useEffect(() => {
+    if (selectedDataset !== 'trajectory') {
+      handlePredict(false);
+    }
   }, [selectedDataset]);
 
   // Mark status as previous when inputs are adjusted
   const markInputsChanged = () => {
-    if (predictionStatus === 'NEWLY PREDICTED') {
-      setPredictionStatus('PREVIOUS PREDICTION');
-    }
     if (selectedDataset === 'trajectory') {
       setTrajRunTrigger(0);
-    } else if (selectedDataset === 'v50') {
-      setV50RunTrigger(0);
-    } else if (selectedDataset === 'performance') {
-      setPerfRunTrigger(0);
+      // Real-time auto-predict hook will refresh prediction and status to 'NEWLY PREDICTED'
+    } else {
+      if (predictionStatus === 'NEWLY PREDICTED') {
+        setPredictionStatus('PREVIOUS PREDICTION');
+      }
+      if (selectedDataset === 'v50') {
+        setV50RunTrigger(0);
+      } else if (selectedDataset === 'performance') {
+        setPerfRunTrigger(0);
+      }
     }
   };
 
@@ -333,9 +381,17 @@ export const SimulatorPage: React.FC = () => {
                   <Sliders className="w-4 h-4 text-cyan-400" />
                   <span>Model Input Features</span>
                 </h3>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
-                  {selectedDataset === 'trajectory' ? '3 Features' : selectedDataset === 'performance' ? '5 Features' : '16 Attributes'}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {selectedDataset === 'trajectory' && (
+                    <span className="flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                      Real-Time ML
+                    </span>
+                  )}
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
+                    {selectedDataset === 'trajectory' ? '3 Features' : selectedDataset === 'performance' ? '5 Features' : '16 Attributes'}
+                  </span>
+                </div>
               </div>
 
             {/* FORM A: TRAJECTORY INPUTS */}
@@ -352,9 +408,13 @@ export const SimulatorPage: React.FC = () => {
                       type="number"
                       min={50}
                       max={2000}
-                      value={trajVelocity}
-                      onChange={(e) => { setTrajVelocity(Number(e.target.value)); markInputsChanged(); }}
-                      className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs font-mono"
+                      value={trajVelocity || ''}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                        setTrajVelocity(isNaN(val) ? 0 : val);
+                        markInputsChanged();
+                      }}
+                      className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs font-mono focus:border-cyan-400 focus:outline-none"
                     />
                     <input
                       type="range"
@@ -362,7 +422,11 @@ export const SimulatorPage: React.FC = () => {
                       max={1200}
                       step={5}
                       value={trajVelocity}
-                      onChange={(e) => { setTrajVelocity(Number(e.target.value)); markInputsChanged(); }}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setTrajVelocity(isNaN(val) ? 0 : val);
+                        markInputsChanged();
+                      }}
                       className="flex-1 accent-cyan-400 h-1.5 bg-slate-800 rounded cursor-pointer"
                     />
                   </div>
@@ -380,9 +444,13 @@ export const SimulatorPage: React.FC = () => {
                       min={0.1}
                       max={89.9}
                       step={0.1}
-                      value={trajAngleDeg}
-                      onChange={(e) => { setTrajAngleDeg(Number(e.target.value)); markInputsChanged(); }}
-                      className="w-20 px-2 py-1 rounded bg-slate-900 border border-cyan-500/50 text-cyan-300 text-xs font-mono font-bold"
+                      value={trajAngleDeg || ''}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                        setTrajAngleDeg(isNaN(val) ? 0 : val);
+                        markInputsChanged();
+                      }}
+                      className="w-20 px-2 py-1 rounded bg-slate-900 border border-cyan-500/50 text-cyan-300 text-xs font-mono font-bold focus:border-cyan-400 focus:outline-none"
                     />
                     <input
                       type="range"
@@ -390,7 +458,11 @@ export const SimulatorPage: React.FC = () => {
                       max={89}
                       step={0.5}
                       value={trajAngleDeg}
-                      onChange={(e) => { setTrajAngleDeg(Number(e.target.value)); markInputsChanged(); }}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setTrajAngleDeg(isNaN(val) ? 0 : val);
+                        markInputsChanged();
+                      }}
                       className="flex-1 accent-cyan-400 h-1.5 bg-slate-800 rounded cursor-pointer"
                     />
                   </div>
@@ -412,9 +484,13 @@ export const SimulatorPage: React.FC = () => {
                       min={0.1}
                       max={25}
                       step={0.01}
-                      value={trajGravity}
-                      onChange={(e) => { setTrajGravity(Number(e.target.value)); markInputsChanged(); }}
-                      className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs font-mono"
+                      value={trajGravity || ''}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                        setTrajGravity(isNaN(val) ? 0 : val);
+                        markInputsChanged();
+                      }}
+                      className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs font-mono focus:border-cyan-400 focus:outline-none"
                     />
                     <input
                       type="range"
@@ -422,7 +498,11 @@ export const SimulatorPage: React.FC = () => {
                       max={20}
                       step={0.1}
                       value={Math.min(trajGravity, 20)}
-                      onChange={(e) => { setTrajGravity(Number(e.target.value)); markInputsChanged(); }}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setTrajGravity(isNaN(val) ? 0 : val);
+                        markInputsChanged();
+                      }}
                       className="flex-1 accent-cyan-400 h-1.5 bg-slate-800 rounded cursor-pointer"
                     />
                   </div>
@@ -765,17 +845,35 @@ export const SimulatorPage: React.FC = () => {
               {/* TRAJECTORY PREDICTIONS */}
               {selectedDataset === 'trajectory' && (
                 <div className="space-y-3">
-                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-                    <div className="text-[10px] text-slate-400 uppercase font-bold">Predicted Range (range_actual)</div>
-                    <div className="text-2xl font-extrabold text-cyan-300">
-                      {(prediction?.prediction?.range_actual || 0).toLocaleString()} m
+                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1 transition-all">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Predicted Range (range_actual)</div>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">RF Pipeline</span>
+                    </div>
+                    <div className="text-2xl font-extrabold text-cyan-300 font-mono tracking-tight">
+                      {prediction?.prediction?.range_actual !== undefined
+                        ? Number(prediction.prediction.range_actual).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + ' m'
+                        : '---'}
+                    </div>
+                    <div className="text-[10px] text-slate-500 flex justify-between">
+                      <span>Total downrange distance</span>
+                      <span className="text-slate-400 font-mono">range_model.pkl</span>
                     </div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-                    <div className="text-[10px] text-slate-400 uppercase font-bold">Predicted Max Height</div>
-                    <div className="text-2xl font-extrabold text-indigo-300">
-                      {(prediction?.prediction?.max_height_actual || 0).toLocaleString()} m
+                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1 transition-all">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Predicted Max Height</div>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">RF Pipeline</span>
+                    </div>
+                    <div className="text-2xl font-extrabold text-indigo-300 font-mono tracking-tight">
+                      {prediction?.prediction?.max_height_actual !== undefined
+                        ? Number(prediction.prediction.max_height_actual).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + ' m'
+                        : '---'}
+                    </div>
+                    <div className="text-[10px] text-slate-500 flex justify-between">
+                      <span>Apex maximum altitude</span>
+                      <span className="text-slate-400 font-mono">height_model.pkl</span>
                     </div>
                   </div>
                 </div>
