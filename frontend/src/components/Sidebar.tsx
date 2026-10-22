@@ -14,7 +14,8 @@ import {
   X,
   Compass,
   LogOut,
-  LogIn
+  LogIn,
+  RotateCcw
 } from 'lucide-react';
 import { HealthStatus, UserProfile } from '../types';
 import { GunLogo } from './GunLogo';
@@ -149,6 +150,24 @@ export const Sidebar: React.FC<Props> = ({
               );
             })}
           </nav>
+
+          {/* Quick Action: Replay Cinematic Intro */}
+          <div className="px-3 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpenMobile(false);
+                window.dispatchEvent(new CustomEvent('replay_ballistic_intro'));
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-cyan-300 hover:bg-slate-900/60 border border-transparent transition-all cursor-pointer ${
+                isCollapsed && !isOpenMobile ? 'justify-center' : ''
+              }`}
+              title="Replay Cinematic Intro"
+            >
+              <RotateCcw className="w-4 h-4 shrink-0 text-cyan-400" />
+              {(!isCollapsed || isOpenMobile) && <span className="truncate">Replay Intro</span>}
+            </button>
+          </div>
         </div>
 
         {/* User Account / Session Footer */}

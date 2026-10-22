@@ -7,6 +7,7 @@ import { SimulatorPage } from './pages/SimulatorPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { AboutPage } from './pages/AboutPage';
 import { AuthModal } from './components/AuthModal';
+import { IntroAnimation } from './components/IntroAnimation';
 import { api } from './services/api';
 import { HealthStatus, UserProfile } from './types';
 import { getCurrentUser, logoutUser } from './utils/auth';
@@ -18,6 +19,15 @@ export const App: React.FC = () => {
   const [isOpenMobile, setIsOpenMobile] = useState<boolean>(false);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
+  // Play once per browser tab session
+  const [showIntro, setShowIntro] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('ballistic_analyst_intro_seen') !== 'true';
+    } catch {
+      return false;
+    }
+  });
+
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => getCurrentUser());
   const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
     try {
@@ -27,6 +37,11 @@ export const App: React.FC = () => {
     }
   });
   const [showAuthModal, setShowAuthModal] = useState<boolean>(() => {
+    let introSeen = false;
+    try {
+      introSeen = sessionStorage.getItem('ballistic_analyst_intro_seen') === 'true';
+    } catch {}
+    if (!introSeen) return false;
     const user = getCurrentUser();
     let guest = false;
     try {
@@ -35,12 +50,21 @@ export const App: React.FC = () => {
     return !user && !guest;
   });
 
-  // If user is not logged in and not in guest mode, show auth modal
+  // Listen for replay requests from sidebar or other components
   useEffect(() => {
-    if (!currentUser && !isGuestMode) {
+    const handleReplay = () => {
+      setShowIntro(true);
+    };
+    window.addEventListener('replay_ballistic_intro', handleReplay);
+    return () => window.removeEventListener('replay_ballistic_intro', handleReplay);
+  }, []);
+
+  // If user is not logged in and not in guest mode, show auth modal once intro completes
+  useEffect(() => {
+    if (!showIntro && !currentUser && !isGuestMode) {
       setShowAuthModal(true);
     }
-  }, [currentUser, isGuestMode]);
+  }, [showIntro, currentUser, isGuestMode]);
 
   // Synchronize authentication changes across components
   useEffect(() => {
@@ -80,8 +104,21 @@ export const App: React.FC = () => {
     setShowAuthModal(true);
   };
 
+  const handleIntroComplete = () => {
+    setShowIntro(false);
+    try {
+      sessionStorage.setItem('ballistic_analyst_intro_seen', 'true');
+    } catch {}
+    if (!currentUser && !isGuestMode) {
+      setShowAuthModal(true);
+    }
+  };
+
   return (
     <>
+      {/* Premium Cinematic Intro Animation */}
+      {showIntro && <IntroAnimation onComplete={handleIntroComplete} />}
+
       {/* Login and Signup Modal with prominent Guest option */}
       <AuthModal
         isOpen={showAuthModal}
