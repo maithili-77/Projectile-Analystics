@@ -203,6 +203,15 @@ export interface AnalyticsInsights {
   datasets: DatasetSummary[];
 }
 
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  role?: string;
+  avatarColor?: string;
+  createdAt: string;
+}
+
 export interface PredictionHistoryItem {
   id?: string;
   type: string;
@@ -213,4 +222,7 @@ export interface PredictionHistoryItem {
   source_page?: string;
   input: Record<string, any>;
   output: Record<string, any>;
+  user_email?: string;
+  user_name?: string;
 }
+

@@ -183,9 +183,22 @@ def get_history():
     """GET /api/history - Returns list of past prediction executions with inputs and readings."""
     return prediction_history_db
 
+@app.delete("/api/history/{item_id}")
+def delete_history_item(item_id: str):
+    """DELETE /api/history/{item_id} - Deletes a specific prediction item by ID."""
+    global prediction_history_db
+    before_len = len(prediction_history_db)
+    prediction_history_db = [item for item in prediction_history_db if item.get("id") != item_id]
+    return {
+        "status": "deleted",
+        "id": item_id,
+        "removed": before_len > len(prediction_history_db)
+    }
+
 @app.delete("/api/history")
 def clear_history():
     """DELETE /api/history - Clears the prediction history log."""
     prediction_history_db.clear()
     return {"status": "cleared", "count": 0}
+
 

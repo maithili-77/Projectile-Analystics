@@ -109,6 +109,14 @@ export const api = {
     return res.data;
   },
 
+  deleteHistoryItem: async (id: string): Promise<void> => {
+    try {
+      await client.delete(`/history/${encodeURIComponent(id)}`);
+    } catch (e) {
+      // Non-fatal if backend session already cleared
+    }
+  },
+
   clearHistory: async (): Promise<void> => {
     await client.delete('/history');
   }

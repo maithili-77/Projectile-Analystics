@@ -291,8 +291,6 @@ export const SimulatorPage: React.FC = () => {
     handlePredict(true);
   };
 
-  const domainScorePct = prediction ? Math.round(prediction.domain_score * 100) : 100;
-
   return (
     <div className="space-y-8 pb-12">
       <AcademicDisclaimer />
@@ -917,28 +915,6 @@ export const SimulatorPage: React.FC = () => {
                   <div className="text-[10px] text-slate-400">Impact Velocity Threshold</div>
                 </div>
               )}
-            </div>
-
-            {/* Pinned Bottom Metadata: Domain Coverage & Loaded Model */}
-            <div className="space-y-3 pt-3 border-t border-slate-800/60">
-              {/* Domain Coverage */}
-              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold">Domain Coverage</span>
-                  <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30 text-[10px]">
-                    {domainScorePct}%
-                  </span>
-                </div>
-                <div className="text-[10px] text-slate-400 leading-relaxed font-sans">
-                  {prediction?.domain_coverage_explanation || 'Input vector evaluated against training bounds.'}
-                </div>
-              </div>
-
-              {/* Active Model Name */}
-              <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[10px] flex items-center justify-between">
-                <span className="text-slate-500 uppercase">Loaded Model</span>
-                <span className="text-slate-200 font-bold">{prediction?.model_name || 'Random Forest Pipeline'}</span>
-              </div>
             </div>
           </div>
         </div>

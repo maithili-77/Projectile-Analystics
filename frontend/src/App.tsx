@@ -8,8 +8,10 @@ import { SimulatorPage } from './pages/SimulatorPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { AboutPage } from './pages/AboutPage';
 import { IntroAnimation } from './components/IntroAnimation';
+import { AuthModal } from './components/AuthModal';
 import { api } from './services/api';
-import { HealthStatus } from './types';
+import { HealthStatus, UserProfile } from './types';
+import { getCurrentUser, logoutUser } from './utils/auth';
 
 export const App: React.FC = () => {
   const [activePage, setActivePage] = useState<PageId>('home');
@@ -17,6 +19,7 @@ export const App: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [isOpenMobile, setIsOpenMobile] = useState<boolean>(false);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+
   const [showIntro, setShowIntro] = useState<boolean>(() => {
     try {
       return !sessionStorage.getItem('ballistix_intro_seen');
@@ -25,6 +28,36 @@ export const App: React.FC = () => {
     }
   });
 
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => getCurrentUser());
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('ballastix_guest_mode') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // If intro has already been seen in this session and user is not logged in and not in guest mode, trigger auth modal on mount
+  useEffect(() => {
+    if (!showIntro && !currentUser && !isGuestMode) {
+      setShowAuthModal(true);
+    }
+  }, [showIntro, currentUser, isGuestMode]);
+
+  // Synchronize authentication changes across components
+  useEffect(() => {
+    const handleAuthChange = () => {
+      const u = getCurrentUser();
+      setCurrentUser(u);
+      if (u) {
+        setIsGuestMode(false);
+      }
+    };
+    window.addEventListener('ballastix_auth_changed', handleAuthChange);
+    return () => window.removeEventListener('ballastix_auth_changed', handleAuthChange);
+  }, []);
+
   useEffect(() => {
     api.getHealth()
       .then(res => setHealth(res))
@@ -32,13 +65,55 @@ export const App: React.FC = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  // Called immediately when gun intro video finishes or is skipped
+  const handleIntroComplete = () => {
+    setShowIntro(false);
+    if (!currentUser && !isGuestMode) {
+      setShowAuthModal(true);
+    }
+  };
+
+  const handleContinueGuest = () => {
+    setIsGuestMode(true);
+    try {
+      sessionStorage.setItem('ballastix_guest_mode', 'true');
+    } catch {}
+    setShowAuthModal(false);
+  };
+
+  const handleLogout = () => {
+    logoutUser();
+    setCurrentUser(null);
+    setIsGuestMode(false);
+    try {
+      sessionStorage.removeItem('ballastix_guest_mode');
+    } catch {}
+    setShowAuthModal(true);
+  };
+
   return (
     <>
       <AnimatePresence>
         {showIntro && (
-          <IntroAnimation onComplete={() => setShowIntro(false)} />
+          <IntroAnimation onComplete={handleIntroComplete} />
         )}
       </AnimatePresence>
+
+      {/* Login and Signup Modal with prominent Guest option */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onSuccess={(user) => {
+          setIsGuestMode(false);
+          try {
+            sessionStorage.removeItem('ballastix_guest_mode');
+          } catch {}
+          setCurrentUser(user);
+          setShowAuthModal(false);
+        }}
+        onClose={() => setShowAuthModal(false)}
+        onContinueGuest={handleContinueGuest}
+        canDismiss={!!currentUser || isGuestMode}
+      />
 
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:flex-row selection:bg-cyan-500 selection:text-slate-950">
         {/* Sidebar Navigation */}
@@ -51,6 +126,9 @@ export const App: React.FC = () => {
           setIsOpenMobile={setIsOpenMobile}
           isCollapsed={isCollapsed}
           setIsCollapsed={setIsCollapsed}
+          currentUser={currentUser}
+          onOpenAuth={() => setShowAuthModal(true)}
+          onLogout={handleLogout}
         />
 
         {/* Main Content Area */}
@@ -71,4 +149,5 @@ export const App: React.FC = () => {
 };
 
 export default App;
+
 

@@ -26,7 +26,9 @@ import {
   ChevronUp,
   Compass,
   Gauge,
-  Target
+  Target,
+  User,
+  Fingerprint
 } from 'lucide-react';
 import { AcademicDisclaimer } from '../components/AcademicDisclaimer';
 import { exportToJSON, exportToCSV } from '../utils/export';
@@ -36,8 +38,9 @@ import {
   deletePredictionHistoryItem,
   clearPredictionHistory,
   loadSamplePredictionHistory,
-  HISTORY_STORAGE_KEY
+  getHistoryUserAccounts
 } from '../utils/history';
+import { getCurrentUser } from '../utils/auth';
 import { PredictionHistoryItem } from '../types';
 import { PageId } from '../components/Sidebar';
 
@@ -46,6 +49,7 @@ interface Props {
 }
 
 export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
+  const currentUser = getCurrentUser();
   const [history, setHistory] = useState<PredictionHistoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedItem, setSelectedItem] = useState<PredictionHistoryItem | null>(null);
@@ -53,31 +57,58 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedRawPayloads, setExpandedRawPayloads] = useState<Record<string, boolean>>({});
 
+  // Active account email whose history is being viewed
+  const [selectedAccountEmail, setSelectedAccountEmail] = useState<string>(
+    () => currentUser?.email || 'guest@ballastix.lab'
+  );
+  const [knownAccounts, setKnownAccounts] = useState<Array<{ email: string; name: string; count: number }>>([]);
+
   const loadHistory = async () => {
     setLoading(true);
-    const local = getPredictionHistory();
+    const accs = getHistoryUserAccounts();
+    setKnownAccounts(accs);
+
+    if (selectedAccountEmail === 'ALL') {
+      // Aggregate history from all local accounts
+      const allItems: PredictionHistoryItem[] = [];
+      for (const acc of accs) {
+        const userItems = getPredictionHistory(acc.email);
+        allItems.push(...userItems);
+      }
+      // Sort newest first
+      allItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setHistory(allItems);
+      setLoading(false);
+      return;
+    }
+
+    const local = getPredictionHistory(selectedAccountEmail);
     if (local.length > 0) {
       setHistory(local);
       setLoading(false);
       return;
     }
 
-    // If local storage is empty, check backend session history
-    try {
-      const remote = await api.getHistory();
-      if (remote && Array.isArray(remote) && remote.length > 0) {
-        setHistory(remote);
-        try {
-          localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(remote));
-        } catch {}
-      } else {
-        setHistory([]);
-      }
-    } catch {
-      setHistory([]);
-    } finally {
-      setLoading(false);
+    // Only if local storage is empty AND user hasn't deleted history, check backend session history for initial migration
+    const hasDeleted = sessionStorage.getItem('ballastix_history_user_deleted') === 'true';
+    if (!hasDeleted) {
+      try {
+        const remote = await api.getHistory();
+        if (remote && Array.isArray(remote) && remote.length > 0) {
+          const enriched = remote.map(item => ({
+            ...item,
+            user_email: item.user_email || selectedAccountEmail,
+            user_name: item.user_name || currentUser?.name || selectedAccountEmail.split('@')[0]
+          }));
+          setHistory(enriched);
+          setLoading(false);
+          return;
+        }
+      } catch {}
     }
+
+    setHistory([]);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -88,33 +119,71 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
       loadHistory();
     };
     window.addEventListener('prediction_history_updated', handleUpdate);
-    return () => window.removeEventListener('prediction_history_updated', handleUpdate);
-  }, []);
+    window.addEventListener('ballastix_auth_changed', handleUpdate);
+    return () => {
+      window.removeEventListener('prediction_history_updated', handleUpdate);
+      window.removeEventListener('ballastix_auth_changed', handleUpdate);
+    };
+  }, [selectedAccountEmail]);
 
   const handleClearAll = async () => {
-    if (confirm('Clear all saved prediction history logs?')) {
-      clearPredictionHistory();
+    const targetLabel = selectedAccountEmail === 'ALL' ? 'all registered accounts' : selectedAccountEmail;
+    if (confirm(`Clear prediction history logs for ${targetLabel}?`)) {
+      sessionStorage.setItem('ballastix_history_user_deleted', 'true');
+      if (selectedAccountEmail === 'ALL') {
+        for (const acc of knownAccounts) {
+          clearPredictionHistory(acc.email);
+        }
+      } else {
+        clearPredictionHistory(selectedAccountEmail);
+      }
       try {
         await api.clearHistory();
       } catch {}
       setHistory([]);
+      setKnownAccounts(getHistoryUserAccounts());
     }
   };
 
-  const handleDeleteItem = (idOrIdx: string | number) => {
-    const updated = deletePredictionHistoryItem(idOrIdx);
-    setHistory(updated);
+  const handleDeleteItem = async (targetItem: PredictionHistoryItem) => {
+    const targetId = targetItem.id;
+    const targetTimestamp = targetItem.timestamp;
+
+    // 1. Instantly remove from local component state for instant responsive UI
+    setHistory(prev => prev.filter(h => {
+      if (targetId && h.id) return h.id !== targetId;
+      if (targetTimestamp && h.timestamp) return h.timestamp !== targetTimestamp;
+      return true;
+    }));
+
+    if (selectedItem && (selectedItem.id === targetId || selectedItem.timestamp === targetTimestamp)) {
+      setSelectedItem(null);
+    }
+
+    // 2. Delete across all localStorage storages
+    deletePredictionHistoryItem(targetItem, selectedAccountEmail);
+    setKnownAccounts(getHistoryUserAccounts());
+
+    // 3. Delete from backend session if ID is available
+    if (targetId) {
+      try {
+        await api.deleteHistoryItem(targetId);
+      } catch {}
+    }
   };
 
   const handleLoadSamples = () => {
-    const samples = loadSamplePredictionHistory();
+    sessionStorage.removeItem('ballastix_history_user_deleted');
+    const samples = loadSamplePredictionHistory(selectedAccountEmail);
     setHistory(samples);
+    setKnownAccounts(getHistoryUserAccounts());
   };
 
   const handleExportJSON = () => {
+    const sanitizedEmail = selectedAccountEmail.replace(/[^a-zA-Z0-9]/g, '_');
     exportToJSON(
       history,
-      `ballistics_prediction_history_${new Date().toISOString().slice(0, 10)}`
+      `ballistics_history_${sanitizedEmail}_${new Date().toISOString().slice(0, 10)}`
     );
   };
 
@@ -124,15 +193,18 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
       ID: item.id || '',
       Domain_Type: item.type,
       Timestamp: item.timestamp,
+      Researcher_Email: item.user_email || selectedAccountEmail,
+      Researcher_Name: item.user_name || currentUser?.name || '',
       Model_Name: item.model_name || '',
       Domain_Score: item.domain_score ?? 1.0,
       Source_Surface: item.source_page || '',
       User_Inputs: JSON.stringify(item.input),
       Model_Readings: JSON.stringify(item.output)
     }));
+    const sanitizedEmail = selectedAccountEmail.replace(/[^a-zA-Z0-9]/g, '_');
     exportToCSV(
       flatRecords,
-      `ballistics_prediction_history_${new Date().toISOString().slice(0, 10)}`
+      `ballistics_history_${sanitizedEmail}_${new Date().toISOString().slice(0, 10)}`
     );
   };
 
@@ -258,6 +330,49 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
                 <span>Run Simulator</span>
               </button>
             )}
+          </div>
+        </div>
+
+        {/* Researcher Account Partitioning Banner */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs font-mono">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 text-cyan-300 flex items-center justify-center shrink-0">
+              <Fingerprint className="w-4 h-4" />
+            </div>
+            <div className="truncate">
+              <div className="text-slate-200 font-bold flex items-center gap-2 truncate">
+                <span>Researcher Account:</span>
+                <span className="text-cyan-300 font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 truncate">
+                  {selectedAccountEmail === 'ALL' ? 'All Local Accounts Combined' : selectedAccountEmail}
+                </span>
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">
+                Each researcher email stores an isolated prediction & simulation history log.
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-slate-400 text-[11px]">View Account:</span>
+            <select
+              value={selectedAccountEmail}
+              onChange={(e) => setSelectedAccountEmail(e.target.value)}
+              className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 text-xs font-mono focus:border-cyan-400 focus:outline-none"
+            >
+              {currentUser?.email && (
+                <option value={currentUser.email}>
+                  Active: {currentUser.name} ({currentUser.email})
+                </option>
+              )}
+              {knownAccounts
+                .filter(acc => acc.email !== currentUser?.email)
+                .map(acc => (
+                  <option key={acc.email} value={acc.email}>
+                    {acc.name} ({acc.email}) — {acc.count} runs
+                  </option>
+                ))}
+              <option value="ALL">🌐 View All Accounts Combined</option>
+            </select>
           </div>
         </div>
 
@@ -411,6 +526,13 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
                         Source: {item.source_page}
                       </span>
                     )}
+
+                    {item.user_email && (
+                      <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono flex items-center gap-1">
+                        <User className="w-3 h-3 text-cyan-400" />
+                        <span>{item.user_email}</span>
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -426,11 +548,15 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
 
                     <button
                       type="button"
-                      onClick={() => handleDeleteItem(item.id || idx)}
-                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-rose-400 border border-slate-700 text-xs font-mono flex items-center gap-1 transition-all"
-                      title="Delete this entry"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteItem(item);
+                      }}
+                      className="px-2 py-1.5 rounded-lg bg-slate-900 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/80 hover:border-rose-500/40 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                      title="Delete this prediction record"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                      <span className="hidden sm:inline text-[11px]">Delete</span>
                     </button>
                   </div>
                 </div>
@@ -764,11 +890,24 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
               </pre>
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedItem) {
+                    handleDeleteItem(selectedItem);
+                  }
+                }}
+                className="py-2 px-3.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span>Delete Record</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setSelectedItem(null)}
-                className="py-2 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-mono"
+                className="py-2 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-mono cursor-pointer"
               >
                 Close Audit View
               </button>

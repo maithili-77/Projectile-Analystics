@@ -12,9 +12,11 @@ import {
   ChevronLeft,
   Menu,
   X,
-  Compass
+  Compass,
+  LogOut,
+  LogIn
 } from 'lucide-react';
-import { HealthStatus } from '../types';
+import { HealthStatus, UserProfile } from '../types';
 
 export type PageId =
   | 'home'
@@ -32,6 +34,9 @@ interface Props {
   setIsOpenMobile: (open: boolean) => void;
   isCollapsed: boolean;
   setIsCollapsed: (collapsed: boolean) => void;
+  currentUser: UserProfile | null;
+  onOpenAuth: () => void;
+  onLogout: () => void;
 }
 
 export const Sidebar: React.FC<Props> = ({
@@ -43,6 +48,9 @@ export const Sidebar: React.FC<Props> = ({
   setIsOpenMobile,
   isCollapsed,
   setIsCollapsed,
+  currentUser,
+  onOpenAuth,
+  onLogout,
 }) => {
   const navItems = [
     { id: 'home', label: 'Home', icon: Home },
@@ -144,6 +152,65 @@ export const Sidebar: React.FC<Props> = ({
               );
             })}
           </nav>
+        </div>
+
+        {/* User Account / Session Footer */}
+        <div className="p-3 border-t border-slate-800/80 bg-slate-950/60">
+          {currentUser ? (
+            <div className={`flex items-center gap-2.5 p-2 rounded-xl bg-slate-900/80 border border-slate-800 ${isCollapsed && !isOpenMobile ? 'justify-center' : 'justify-between'}`}>
+              <div
+                onClick={onOpenAuth}
+                className="flex items-center gap-2.5 min-w-0 cursor-pointer group"
+                title="Click to view researcher account details"
+              >
+                <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${currentUser.avatarColor || 'from-cyan-500 to-indigo-600'} flex items-center justify-center text-white text-xs font-black shadow-sm shrink-0`}>
+                  {currentUser.name.charAt(0).toUpperCase()}
+                </div>
+                {(!isCollapsed || isOpenMobile) && (
+                  <div className="truncate">
+                    <div className="text-xs font-bold text-slate-200 group-hover:text-cyan-300 transition-colors truncate">
+                      {currentUser.name}
+                    </div>
+                    <div className="text-[10px] text-cyan-400 font-mono truncate" title={currentUser.email}>
+                      {currentUser.email}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {(!isCollapsed || isOpenMobile) ? (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 border border-transparent hover:border-rose-500/30 transition-all cursor-pointer shrink-0"
+                  title="Sign Out / Switch Researcher Account"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {(!isCollapsed || isOpenMobile) && (
+                <div className="flex items-center justify-between px-1 text-[10px] font-mono text-slate-400">
+                  <span className="flex items-center gap-1.5 text-slate-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                    <span>Guest Access</span>
+                  </span>
+                  <span className="text-slate-500">Unsaved Session</span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={onOpenAuth}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-cyan-500/10 to-indigo-500/10 hover:from-cyan-500/20 hover:to-indigo-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 ${isCollapsed && !isOpenMobile ? 'justify-center' : ''}`}
+                title="Sign In or Register to save your predictions"
+              >
+                <LogIn className="w-4 h-4 shrink-0 text-cyan-400" />
+                {(!isCollapsed || isOpenMobile) && <span>Sign In / Register</span>}
+              </button>
+            </div>
+          )}
         </div>
 
       </aside>
