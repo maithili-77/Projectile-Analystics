@@ -45,13 +45,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.on_event("startup")
 def startup_event():
-    """Server Startup Lifecycle Event: Loads PKL models into memory & caches dataset summaries."""
-    print("[FastAPI] Executing server startup lifecycle tasks...")
+    """Initialize models without precomputing all dataset summaries."""
+    print("[FastAPI] Executing server startup tasks...")
     load_all_models()
-    cache_dataset_summaries()
-    print("[FastAPI] Startup initialization complete.")
+    print("[FastAPI] Model initialization complete.")
+
 
 # 1. Healthcheck Endpoint
 @app.get("/api/health")
