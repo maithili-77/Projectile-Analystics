@@ -135,7 +135,7 @@ export const App: React.FC = () => {
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col justify-between min-w-0 overflow-x-hidden">
-          <main className="p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          <main className="px-3 py-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
             {activePage === 'home' && <HomePage setActivePage={setActivePage} health={health} />}
             {activePage === 'calculator' && <CalculatorPage setActivePage={setActivePage} />}
             {activePage === 'simulator' && <SimulatorPage />}

@@ -437,7 +437,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage 
       <AcademicDisclaimer />
 
       {/* Hero Header Section */}
-      <div className="relative rounded-2xl glass-panel p-6 sm:p-8 overflow-hidden border border-slate-800 bg-grid-pattern">
+      <div className="relative rounded-2xl glass-panel p-5 sm:p-8 overflow-hidden border border-slate-800 bg-grid-pattern">
         <div className="absolute -top-24 -right-24 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -466,7 +466,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage 
         {/* LEFT COLUMN: Input Parameters & Specimen Presets (5 Cols)      */}
         {/* ------------------------------------------------------------- */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-5 font-mono text-xs">
+          <div className="glass-panel p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-5 font-mono text-xs">
             
             {/* Panel Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -537,7 +537,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage 
               className="space-y-3.5 pt-2 border-t border-slate-800"
             >
               {/* Row 1: Projectile Type & Target Material */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 mb-1">Projectile Type:</label>
                   <select
@@ -568,7 +568,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage 
               </div>
 
               {/* Row 2: Calibre & Projectile Mass */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 mb-1">Calibre (mm):</label>
                   <input
@@ -599,7 +599,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage 
               </div>
 
               {/* Row 3: Plate Thickness & Obliquity Angle */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 mb-1">Plate Thickness (mm):</label>
                   <input
@@ -630,7 +630,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage 
               </div>
 
               {/* Row 4: Material Strength Attributes (Yield & UTS) */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 mb-1">Yield Strength (MPa):</label>
                   <input
@@ -661,7 +661,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage 
               </div>
 
               {/* Row 5: Material Elongation & Target Hardness */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 mb-1">Elongation (%):</label>
                   <input
@@ -853,8 +853,8 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage 
           </div>
 
           {/* Interactive Perforation Probability S-Curve Graph */}
-          <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="glass-panel p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
               <div>
                 <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wider font-mono flex items-center gap-2">
                   <Activity className="w-4 h-4 text-purple-400" />
@@ -868,7 +868,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage 
               <button
                 type="button"
                 onClick={() => setShowTable(!showTable)}
-                className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-mono border border-slate-800 flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-mono border border-slate-800 flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto shrink-0"
               >
                 <TableIcon className="w-3.5 h-3.5 text-purple-400" />
                 <span>{showTable ? 'Hide Table' : 'Show Probability Table'}</span>
@@ -876,7 +876,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage 
             </div>
 
             {/* S-Curve Area Chart with Key tied to prediction updates */}
-            <div className="w-full h-80 sm:h-96">
+            <div className="w-full h-72 sm:h-80 md:h-96">
               {curveData.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-slate-500 font-mono text-xs">
                   Awaiting model prediction calculation.
@@ -886,7 +886,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage 
                   <AreaChart
                     key={`v50-chart-${v50Val.toFixed(1)}-${calcCount}`}
                     data={curveData}
-                    margin={{ top: 20, right: 30, left: 15, bottom: 25 }}
+                    margin={{ top: 20, right: 15, left: -5, bottom: 25 }}
                   >
                     <defs>
                       <linearGradient id="v50CurveGrad" x1="0" y1="0" x2="0" y2="1">
@@ -1077,7 +1077,7 @@ export const CalculatorPage: React.FC<Props> = ({ setActivePage: _setActivePage 
                     />
                   </div>
 
-                  <div className="sm:col-span-5 flex items-center justify-end gap-2 flex-wrap">
+                  <div className="sm:col-span-5 flex items-center justify-start sm:justify-end gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-xs">
                       <input
                         type="number"

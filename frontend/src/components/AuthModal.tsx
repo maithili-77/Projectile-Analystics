@@ -110,19 +110,16 @@ export const AuthModal: React.FC<Props> = ({
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 20 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="relative w-full max-w-xl rounded-2xl glass-card border border-slate-700/80 bg-slate-900/90 shadow-2xl overflow-hidden my-8"
+          className="relative w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-2xl glass-card border border-slate-700/80 bg-slate-900/90 shadow-2xl my-auto"
         >
           {/* Header Banner */}
-          <div className="p-6 sm:p-8 border-b border-slate-800 bg-gradient-to-b from-slate-800/40 to-transparent">
-            <div className="flex items-center justify-between">
+          <div className="p-4 sm:p-6 sm:p-8 border-b border-slate-800 bg-gradient-to-b from-slate-800/40 to-transparent">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <GunLogo size="lg" />
+                <GunLogo size="md" />
                 <div>
-                  <h2 className="text-xl font-black text-slate-100 tracking-wider uppercase flex items-center gap-2">
-                    <span>BALLASTIC PREDICTION SYSTEM</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
-                      SECURE LAB
-                    </span>
+                  <h2 className="text-lg sm:text-xl font-black text-slate-100 tracking-wider uppercase">
+                    BALLASTIC PREDICTION SYSTEM
                   </h2>
                   <p className="text-xs text-slate-400 font-mono mt-0.5">
                     {mode === 'LOGIN' ? 'Sign in to access personalized prediction sessions' : 'Create a researcher profile to store prediction history'}
@@ -131,7 +128,7 @@ export const AuthModal: React.FC<Props> = ({
               </div>
 
               {/* Guest option in header */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
                 <button
                   type="button"
                   onClick={handleGuestClick}
@@ -185,7 +182,7 @@ export const AuthModal: React.FC<Props> = ({
           </div>
 
           {/* Main Form */}
-          <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-4">
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 sm:p-8 space-y-4">
             {error && (
               <motion.div
                 initial={{ opacity: 0, y: -8 }}

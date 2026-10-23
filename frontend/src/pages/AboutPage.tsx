@@ -19,7 +19,7 @@ export const AboutPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="glass-card p-8 rounded-2xl border border-slate-800 space-y-6 text-slate-300 text-sm leading-relaxed font-sans">
+      <div className="glass-card p-5 sm:p-8 rounded-2xl border border-slate-800 space-y-6 text-slate-300 text-sm leading-relaxed font-sans">
         <div className="space-y-3">
           <h2 className="text-base font-bold text-cyan-300 flex items-center gap-2">
             <BookOpen className="w-4 h-4" />

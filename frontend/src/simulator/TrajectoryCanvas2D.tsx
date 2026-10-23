@@ -1164,15 +1164,15 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
         />
 
         {/* Top-Right Telemetry Badges (Instant updates without React re-render) */}
-        <div className="absolute top-3 right-3 flex flex-col gap-1 items-end pointer-events-none">
-          <div className="px-2.5 py-1 rounded bg-slate-950/85 border border-cyan-500/40 text-[10px] font-mono text-cyan-300 backdrop-blur-sm shadow-md">
-            BULLET SPEED: <strong ref={liveSpeedDomRef}>{Math.round(velocity)} m/s</strong>
+        <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex flex-col gap-1 items-end pointer-events-none">
+          <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded bg-slate-950/85 border border-cyan-500/40 text-[9px] sm:text-[10px] font-mono text-cyan-300 backdrop-blur-sm shadow-md">
+            SPEED: <strong ref={liveSpeedDomRef}>{Math.round(velocity)} m/s</strong>
           </div>
-          <div className="px-2.5 py-1 rounded bg-slate-950/85 border border-amber-500/40 text-[10px] font-mono text-amber-300 backdrop-blur-sm shadow-md">
-            MAX HEIGHT: <strong>{Math.round(predictedHeight || maxHeight).toLocaleString()} m</strong>
+          <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded bg-slate-950/85 border border-amber-500/40 text-[9px] sm:text-[10px] font-mono text-amber-300 backdrop-blur-sm shadow-md">
+            HEIGHT: <strong>{Math.round(predictedHeight || maxHeight).toLocaleString()} m</strong>
           </div>
-          <div className="px-2.5 py-1 rounded bg-slate-950/85 border border-emerald-500/40 text-[10px] font-mono text-emerald-300 backdrop-blur-sm shadow-md">
-            TARGET RANGE: <strong>{Math.round(predictedRange || maxRange).toLocaleString()} m</strong>
+          <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded bg-slate-950/85 border border-emerald-500/40 text-[9px] sm:text-[10px] font-mono text-emerald-300 backdrop-blur-sm shadow-md">
+            RANGE: <strong>{Math.round(predictedRange || maxRange).toLocaleString()} m</strong>
           </div>
         </div>
       </div>

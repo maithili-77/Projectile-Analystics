@@ -102,7 +102,7 @@ export const V50Visualizer: React.FC<V50VisualizerProps> = ({
     : Math.round(v50);
 
   return (
-    <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex flex-col justify-between h-full space-y-4 font-mono text-xs">
+    <div className="glass-panel p-4 sm:p-5 rounded-2xl border border-slate-800 flex flex-col justify-between h-full space-y-4 font-mono text-xs">
       {/* Visualizer Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
         <div>
@@ -297,11 +297,11 @@ export const V50Visualizer: React.FC<V50VisualizerProps> = ({
         </div>
 
         {/* Bottom Legend & Mechanical Attributes */}
-        <div className="relative z-10 grid grid-cols-4 gap-2 text-[10px] border-t border-slate-800/80 pt-2 text-slate-400">
+        <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] border-t border-slate-800/80 pt-2 text-slate-400">
           <div>Yield: <strong className="text-slate-200">{yieldStrength} MPa</strong></div>
           <div>Hardness: <strong className="text-slate-200">{hardness} HB</strong></div>
           <div>Density: <strong className="text-slate-200">{density} g/cm³</strong></div>
-          <div className="text-right text-purple-400 font-bold">V50 Limit: {v50 > 0 ? `${v50.toFixed(1)} m/s` : '---'}</div>
+          <div className="text-left sm:text-right text-purple-400 font-bold">V50 Limit: {v50 > 0 ? `${v50.toFixed(1)} m/s` : '---'}</div>
         </div>
       </div>
 

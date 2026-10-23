@@ -14,8 +14,7 @@ import {
   X,
   Compass,
   LogOut,
-  LogIn,
-  RotateCcw
+  LogIn
 } from 'lucide-react';
 import { HealthStatus, UserProfile } from '../types';
 import { GunLogo } from './GunLogo';
@@ -71,16 +70,17 @@ export const Sidebar: React.FC<Props> = ({
   return (
     <>
       {/* Mobile Top Navbar with Hamburger */}
-      <div className="lg:hidden sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+      <div className="lg:hidden sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <GunLogo size="sm" />
-          <span className="text-xs font-bold tracking-wider text-slate-100 uppercase">
+          <span className="text-[11px] sm:text-xs font-bold tracking-wider text-slate-100 uppercase truncate">
             BALLASTIC PREDICTION SYSTEM
           </span>
         </div>
         <button
           onClick={() => setIsOpenMobile(!isOpenMobile)}
-          className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white"
+          className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white shrink-0"
+          aria-label="Toggle navigation menu"
         >
           {isOpenMobile ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
@@ -97,7 +97,7 @@ export const Sidebar: React.FC<Props> = ({
       {/* Sidebar Desktop / Tablet / Mobile Drawer */}
       <aside
         className={`fixed lg:static top-0 bottom-0 left-0 z-50 flex flex-col justify-between bg-slate-950/95 border-r border-slate-800/80 backdrop-blur-xl transition-all duration-300 ${
-          isOpenMobile ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0'
+          isOpenMobile ? 'translate-x-0 w-64 max-w-[85vw]' : '-translate-x-full lg:translate-x-0'
         } ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}`}
       >
         <div>
@@ -151,23 +151,6 @@ export const Sidebar: React.FC<Props> = ({
             })}
           </nav>
 
-          {/* Quick Action: Replay Cinematic Intro */}
-          <div className="px-3 pt-1">
-            <button
-              type="button"
-              onClick={() => {
-                setIsOpenMobile(false);
-                window.dispatchEvent(new CustomEvent('replay_ballistic_intro'));
-              }}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-cyan-300 hover:bg-slate-900/60 border border-transparent transition-all cursor-pointer ${
-                isCollapsed && !isOpenMobile ? 'justify-center' : ''
-              }`}
-              title="Replay Cinematic Intro"
-            >
-              <RotateCcw className="w-4 h-4 shrink-0 text-cyan-400" />
-              {(!isCollapsed || isOpenMobile) && <span className="truncate">Replay Intro</span>}
-            </button>
-          </div>
         </div>
 
         {/* User Account / Session Footer */}

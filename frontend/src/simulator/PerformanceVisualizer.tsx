@@ -1014,7 +1014,7 @@ export const PerformanceVisualizer: React.FC<PerformanceProps> = ({
               </div>
 
               {/* Layout Mode Selector */}
-              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-mono">
+              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-mono overflow-x-auto max-w-full shrink-0">
                 <button
                   type="button"
                   onClick={() => setGraphsLayout('grid')}

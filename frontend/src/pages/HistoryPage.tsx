@@ -232,11 +232,11 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
       <AcademicDisclaimer />
 
       {/* Main Page Header */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4 bg-grid-pattern">
+      <div className="glass-panel p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4 bg-grid-pattern">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-100 flex items-center gap-2.5">
-              <History className="w-6 h-6 text-indigo-400" />
+            <h1 className="text-lg sm:text-2xl font-extrabold text-slate-100 flex flex-wrap items-center gap-2.5">
+              <History className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400 shrink-0" />
               <span>PREDICTION & SIMULATION AUDIT HISTORY</span>
             </h1>
             <p className="text-xs text-slate-300 font-mono mt-1">
@@ -459,7 +459,7 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
             return (
               <div
                 key={itemId}
-                className={`glass-panel p-5 rounded-2xl border border-slate-800/90 shadow-xl space-y-4 transition-all duration-200 ${borderHighlight}`}
+                className={`glass-panel p-4 sm:p-5 rounded-2xl border border-slate-800/90 shadow-xl space-y-4 transition-all duration-200 ${borderHighlight}`}
               >
                 {/* Header Row: Domain Badge, Timestamp, Execution Surface, Action Controls */}
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
@@ -812,7 +812,7 @@ export const HistoryPage: React.FC<Props> = ({ setActivePage }) => {
       {/* Item Detail Modal */}
       {selectedItem && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-card p-6 rounded-2xl border border-slate-800 max-w-2xl w-full space-y-4 font-mono text-xs max-h-[90vh] overflow-y-auto">
+          <div className="glass-card p-4 sm:p-6 rounded-2xl border border-slate-800 max-w-2xl w-full space-y-4 font-mono text-xs max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <span className="px-2.5 py-1 rounded bg-cyan-500/20 text-cyan-300 font-bold uppercase text-[11px] border border-cyan-500/40">

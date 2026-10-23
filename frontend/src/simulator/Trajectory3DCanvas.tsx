@@ -71,14 +71,14 @@ export const Trajectory3DCanvas: React.FC<Props> = ({
     const container = mountRef.current;
     if (!container || effectivePoints.length === 0) return;
 
-    const width = container.clientWidth || 600;
-    const height = 360;
+    const initialWidth = container.clientWidth || 600;
+    const initialHeight = container.clientHeight || 360;
 
     // 1. Scene, Camera, Renderer (Theme-harmonized slate-navy, not pitch black)
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x121e30);
 
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 200000);
+    const camera = new THREE.PerspectiveCamera(45, initialWidth / initialHeight, 0.1, 200000);
 
     const v0 = Math.max(1, Number(velocity));
     const g = Number(gravity) > 0 ? Number(gravity) : 9.81;
@@ -98,10 +98,24 @@ export const Trajectory3DCanvas: React.FC<Props> = ({
     camera.lookAt(effectiveSpan * 0.5, effectiveSpan * 0.22, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(initialWidth, initialHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
+
+    // Handle container dimension updates dynamically on mobile and desktop resize
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const newW = entry.contentRect.width;
+        const newH = entry.contentRect.height;
+        if (newW > 0 && newH > 0) {
+          camera.aspect = newW / newH;
+          camera.updateProjectionMatrix();
+          renderer.setSize(newW, newH);
+        }
+      }
+    });
+    resizeObserver.observe(container);
 
     // 2. Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
@@ -293,6 +307,7 @@ export const Trajectory3DCanvas: React.FC<Props> = ({
 
     return () => {
       cancelAnimationFrame(animId);
+      resizeObserver.disconnect();
       if (container) container.innerHTML = '';
       renderer.dispose();
     };
@@ -309,7 +324,7 @@ export const Trajectory3DCanvas: React.FC<Props> = ({
           Elevation: {angleDeg.toFixed(1)}°
         </span>
       </div>
-      <div ref={mountRef} className="w-full h-[360px] rounded-lg overflow-hidden border border-slate-700/80 bg-slate-900 shadow-inner" />
+      <div ref={mountRef} className="w-full h-[280px] sm:h-[340px] md:h-[360px] rounded-lg overflow-hidden border border-slate-700/80 bg-slate-900 shadow-inner" />
     </div>
   );
 };

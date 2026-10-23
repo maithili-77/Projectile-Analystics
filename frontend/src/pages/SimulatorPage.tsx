@@ -298,11 +298,11 @@ export const SimulatorPage: React.FC = () => {
       <AcademicDisclaimer />
 
       {/* Header Title & Dataset Mode Selector */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-5 bg-grid-pattern">
+      <div className="glass-panel p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4 sm:space-y-5 bg-grid-pattern">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
           <div>
-            <h1 className="text-xl sm:text-3xl font-extrabold text-slate-100 tracking-tight flex items-center gap-3">
-              <GunLogo size="lg" />
+            <h1 className="text-lg sm:text-2xl md:text-3xl font-extrabold text-slate-100 tracking-tight flex flex-wrap items-center gap-2.5 sm:gap-3">
+              <GunLogo size="md" />
               <span>BALLASTIC PREDICTION SYSTEM &bull; SIMULATOR</span>
             </h1>
             <p className="text-xs text-slate-300 font-mono mt-1">
@@ -374,7 +374,7 @@ export const SimulatorPage: React.FC = () => {
 
         {/* COLUMN 1: Dynamic Input Form (3 Cols on LG) */}
         <div className="lg:col-span-3 flex flex-col">
-          <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex flex-col justify-between h-full space-y-4">
+          <div className="glass-panel p-4 sm:p-5 rounded-2xl border border-slate-800 flex flex-col justify-between h-full space-y-4">
             <div>
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 mb-4">
                 <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-mono">
@@ -737,7 +737,7 @@ export const SimulatorPage: React.FC = () => {
         {/* COLUMN 2: Dedicated Visualization Canvas (6 Cols on LG) */}
         <div className="lg:col-span-6 flex flex-col">
           {selectedDataset === 'trajectory' ? (
-            <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex flex-col justify-between h-full space-y-4">
+            <div className="glass-panel p-4 sm:p-5 rounded-2xl border border-slate-800 flex flex-col justify-between h-full space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
                 <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-mono">
                   <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
@@ -830,7 +830,7 @@ export const SimulatorPage: React.FC = () => {
 
         {/* COLUMN 3: Prediction Output Cards (3 Cols on LG) */}
         <div className="lg:col-span-3 flex flex-col font-mono text-xs">
-          <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex flex-col justify-between h-full space-y-4">
+          <div className="glass-panel p-4 sm:p-5 rounded-2xl border border-slate-800 flex flex-col justify-between h-full space-y-4">
             <div>
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 mb-4">
                 <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-sans flex items-center gap-2">
