@@ -303,7 +303,7 @@ export const SimulatorPage: React.FC = () => {
           <div>
             <h1 className="text-xl sm:text-3xl font-extrabold text-slate-100 tracking-tight flex items-center gap-3">
               <GunLogo size="lg" />
-              <span>BALLASTIX INTERACTIVE MULTI-DOMAIN SIMULATOR</span>
+              <span>BALLASTIC PREDICTION SYSTEM &bull; SIMULATOR</span>
             </h1>
             <p className="text-xs text-slate-300 font-mono mt-1">
               Select an experimental data & machine learning domain to run live interactive simulations.

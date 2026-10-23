@@ -11,7 +11,7 @@ export const AboutPage: React.FC = () => {
         <div>
           <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
             <Info className="w-5 h-5 text-cyan-400" />
-            <span>About Ballastix</span>
+            <span>About Ballastic Prediction System</span>
           </h1>
           <p className="text-xs text-slate-400 font-mono">
             Academic Machine Learning Research & Computational Physics Demonstration
@@ -26,7 +26,7 @@ export const AboutPage: React.FC = () => {
             <span>Platform Overview & Objectives</span>
           </h2>
           <p className="text-xs text-slate-300 leading-relaxed">
-            The <strong>Ballastix Analytics and Simulation Platform</strong> is an academic research platform designed to evaluate and visualize machine learning regressors across three core ballistic physics domains:
+            The <strong>Ballastic Prediction System</strong> is an academic research platform designed to evaluate and visualize machine learning regressors across three core ballistic physics domains:
           </p>
           <ol className="list-decimal list-inside text-xs text-slate-400 font-mono space-y-1 pl-2">
             <li><strong>Exterior Kinematic Trajectories:</strong> Modeling trajectory distance and maximum apex altitude from initial launch parameters.</li>

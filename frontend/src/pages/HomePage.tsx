@@ -37,8 +37,8 @@ export const HomePage: React.FC<Props> = ({ setActivePage }) => {
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-100 tracking-tight leading-tight">
-            BALLASTIX <br />
-            <span className="text-gradient-cyan">ANALYTICS PLATFORM</span>
+            BALLASTIC <br />
+            <span className="text-gradient-cyan">PREDICTION SYSTEM</span>
           </h1>
 
           <p className="text-slate-300 text-sm sm:text-base leading-relaxed">

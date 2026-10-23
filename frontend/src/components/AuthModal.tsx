@@ -119,7 +119,7 @@ export const AuthModal: React.FC<Props> = ({
                 <GunLogo size="lg" />
                 <div>
                   <h2 className="text-xl font-black text-slate-100 tracking-wider uppercase flex items-center gap-2">
-                    <span>BALLASTIX</span>
+                    <span>BALLASTIC PREDICTION SYSTEM</span>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
                       SECURE LAB
                     </span>

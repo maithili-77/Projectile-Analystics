@@ -89,7 +89,7 @@ export const OverviewPage: React.FC<Props> = ({ setActiveTab, health }) => {
           </div>
 
           <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-100 tracking-tight leading-tight">
-            Ballastix &mdash; <span className="text-gradient-cyan">Analytics & Simulation System</span>
+            Ballastic Prediction System &mdash; <span className="text-gradient-cyan">Analytics & Simulation</span>
           </h1>
 
           <p className="text-slate-300 text-sm leading-relaxed">

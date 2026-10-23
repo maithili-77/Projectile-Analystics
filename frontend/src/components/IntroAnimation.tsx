@@ -6,6 +6,9 @@ interface Props {
   onComplete: () => void;
 }
 
+const ANIMATION_DURATION = 3.6; // 3.6s active sequence + 0.4s fade = exactly 4.0s total intro
+const FADE_OUT_DURATION = 0.4;
+
 export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
   const [isFadingOut, setIsFadingOut] = useState<boolean>(false);
   const [hasFinished, setHasFinished] = useState<boolean>(false);
@@ -27,7 +30,7 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
     // Allow smooth fade-out transition before unmounting
     setTimeout(() => {
       onComplete();
-    }, 450);
+    }, FADE_OUT_DURATION * 1000);
   };
 
   // Keyboard shortcut listener (Escape or Space to skip immediately)
@@ -58,15 +61,15 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
       return;
     }
 
-    // Sequence timing: ~4.55s of cinematic animation + 0.45s smooth fade = 5.0s total duration
+    // Sequence timing: 3.6s of cinematic animation + 0.4s smooth fade = exactly 4.0s total duration
     timerRef.current = setTimeout(() => {
       handleFinish();
-    }, 4550);
+    }, ANIMATION_DURATION * 1000);
 
-    // Fail-safe safety timer: under no circumstances stay stuck after 5.8s
+    // Fail-safe safety timer: under no circumstances stay stuck after 4.6s
     safetyTimerRef.current = setTimeout(() => {
       handleFinish();
-    }, 5800);
+    }, 4600);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -81,7 +84,7 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
           initial={{ opacity: 1 }}
           animate={{ opacity: isFadingOut ? 0 : 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: FADE_OUT_DURATION, ease: [0.22, 1, 0.36, 1] }}
           className="fixed inset-0 z-[120] w-screen h-screen flex flex-col items-center justify-center bg-white text-slate-900 select-none overflow-hidden"
           style={{ backgroundColor: '#FFFFFF' }}
         >
@@ -168,7 +171,7 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
                   opacity: [0, 1, 1, 1],
                 }}
                 transition={{
-                  duration: 4.55,
+                  duration: ANIMATION_DURATION,
                   times: [0, 0.22, 0.85, 1],
                   ease: [0.16, 1, 0.3, 1],
                 }}
@@ -305,7 +308,7 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
                   opacity: [0, 0, 1, 0.4, 0],
                 }}
                 transition={{
-                  duration: 4.55,
+                  duration: ANIMATION_DURATION,
                   times: [0, 0.24, 0.32, 0.52, 1],
                   ease: 'easeOut',
                 }}
@@ -326,7 +329,7 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
                   opacity: [0, 1, 1, 1, 1],
                 }}
                 transition={{
-                  duration: 4.55,
+                  duration: ANIMATION_DURATION,
                   times: [0, 0.22, 0.26, 0.34, 1],
                   ease: [0.16, 1, 0.3, 1],
                 }}
@@ -430,7 +433,7 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
                   opacity: [0, 0, 1, 0, 0],
                 }}
                 transition={{
-                  duration: 4.55,
+                  duration: ANIMATION_DURATION,
                   times: [0, 0.23, 0.25, 0.31, 1],
                   ease: 'easeOut',
                 }}
@@ -471,7 +474,7 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
                   opacity: [0, 0, 1, 0.95, 0],
                 }}
                 transition={{
-                  duration: 4.55,
+                  duration: ANIMATION_DURATION,
                   times: [0, 0.24, 0.28, 0.52, 0.68],
                   ease: [0.16, 1, 0.3, 1],
                 }}
@@ -502,10 +505,10 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
                 </g>
               </motion.g>
 
-              {/* 6. Typography Reveal: BALLISTIC ANALYST */}
-              {/* Bold Royal Blue "BALLISTIC" revealed as bullet flies across */}
+              {/* 6. Typography Reveal: BALLASTIC PREDICTION */}
+              {/* Bold Royal Blue "BALLASTIC" revealed as bullet flies across */}
               <g transform="translate(450, 375)">
-                {/* "BALLISTIC" in bold royal blue */}
+                {/* "BALLASTIC" in bold royal blue */}
                 <motion.g
                   initial={{ opacity: 0, y: 16, filter: 'blur(8px)' }}
                   animate={{
@@ -514,7 +517,7 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
                     filter: ['blur(8px)', 'blur(8px)', 'blur(0px)', 'blur(0px)', 'blur(0px)'],
                   }}
                   transition={{
-                    duration: 4.55,
+                    duration: ANIMATION_DURATION,
                     times: [0, 0.28, 0.42, 0.85, 1],
                     ease: [0.16, 1, 0.3, 1],
                   }}
@@ -530,19 +533,19 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
                     letterSpacing="0.22em"
                     className="drop-shadow-[0_2px_12px_rgba(29,78,216,0.18)]"
                   >
-                    BALLISTIC
+                    BALLASTIC
                   </text>
                 </motion.g>
 
-                {/* "ANALYST" in smaller, widely spaced navy letters */}
+                {/* "PREDICTION" in smaller, widely spaced navy letters */}
                 <motion.g
-                  initial={{ opacity: 0, letterSpacing: '0.15em' }}
+                  initial={{ opacity: 0, letterSpacing: '0.12em' }}
                   animate={{
                     opacity: [0, 0, 1, 1, 1],
-                    letterSpacing: ['0.15em', '0.15em', '0.52em', '0.52em', '0.52em'],
+                    letterSpacing: ['0.12em', '0.12em', '0.36em', '0.36em', '0.36em'],
                   }}
                   transition={{
-                    duration: 4.55,
+                    duration: ANIMATION_DURATION,
                     times: [0, 0.38, 0.52, 0.85, 1],
                     ease: [0.16, 1, 0.3, 1],
                   }}
@@ -552,12 +555,12 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
                     y="34"
                     textAnchor="middle"
                     fill="#0F172A"
-                    fontSize="16"
+                    fontSize="15"
                     fontFamily="system-ui, -apple-system, sans-serif"
                     fontWeight="700"
-                    className="tracking-[0.52em]"
+                    className="tracking-[0.36em]"
                   >
-                    ANALYST
+                    PREDICTION
                   </text>
                 </motion.g>
 
@@ -569,18 +572,18 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
                     scaleX: [0, 0, 1, 1, 1],
                   }}
                   transition={{
-                    duration: 4.55,
+                    duration: ANIMATION_DURATION,
                     times: [0, 0.46, 0.58, 0.85, 1],
                     ease: 'easeOut',
                   }}
                 >
                   {/* Left accent line & dot */}
-                  <line x1="-220" y1="28" x2="-140" y2="28" stroke="#EA580C" strokeWidth="1.5" />
-                  <circle cx="-136" cy="28" r="2" fill="#F97316" />
+                  <line x1="-240" y1="28" x2="-152" y2="28" stroke="#EA580C" strokeWidth="1.5" />
+                  <circle cx="-148" cy="28" r="2" fill="#F97316" />
 
                   {/* Right accent line & dot */}
-                  <circle cx="136" cy="28" r="2" fill="#F97316" />
-                  <line x1="140" y1="28" x2="220" y2="28" stroke="#EA580C" strokeWidth="1.5" />
+                  <circle cx="148" cy="28" r="2" fill="#F97316" />
+                  <line x1="152" y1="28" x2="240" y2="28" stroke="#EA580C" strokeWidth="1.5" />
 
                   {/* Subtitle technical specs */}
                   <text
@@ -606,7 +609,7 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
                   opacity: [0, 0, 0.6, 0],
                 }}
                 transition={{
-                  duration: 4.55,
+                  duration: ANIMATION_DURATION,
                   times: [0, 0.62, 0.84, 1],
                   ease: 'easeInOut',
                 }}
@@ -623,12 +626,12 @@ export const IntroAnimation: React.FC<Props> = ({ onComplete }) => {
               </motion.g>
             </svg>
 
-            {/* Bottom Progress Bar Indicator for the 5s Sequence */}
+            {/* Bottom Progress Bar Indicator for the 4s Sequence */}
             <div className="w-48 sm:w-64 h-1 bg-slate-100 rounded-full mt-2 overflow-hidden border border-slate-200/60">
               <motion.div
                 initial={{ width: '0%' }}
                 animate={{ width: '100%' }}
-                transition={{ duration: 4.55, ease: 'linear' }}
+                transition={{ duration: ANIMATION_DURATION, ease: 'linear' }}
                 className="h-full bg-gradient-to-r from-blue-600 via-blue-500 to-orange-500 rounded-full"
               />
             </div>

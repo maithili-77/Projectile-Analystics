@@ -19,14 +19,8 @@ export const App: React.FC = () => {
   const [isOpenMobile, setIsOpenMobile] = useState<boolean>(false);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
-  // Play once per browser tab session
-  const [showIntro, setShowIntro] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem('ballistic_analyst_intro_seen') !== 'true';
-    } catch {
-      return false;
-    }
-  });
+  // Show 4-second cinematic intro animation on application load
+  const [showIntro, setShowIntro] = useState<boolean>(true);
 
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => getCurrentUser());
   const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
@@ -36,19 +30,7 @@ export const App: React.FC = () => {
       return false;
     }
   });
-  const [showAuthModal, setShowAuthModal] = useState<boolean>(() => {
-    let introSeen = false;
-    try {
-      introSeen = sessionStorage.getItem('ballistic_analyst_intro_seen') === 'true';
-    } catch {}
-    if (!introSeen) return false;
-    const user = getCurrentUser();
-    let guest = false;
-    try {
-      guest = sessionStorage.getItem('ballastix_guest_mode') === 'true';
-    } catch {}
-    return !user && !guest;
-  });
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
 
   // Listen for replay requests from sidebar or other components
   useEffect(() => {

@@ -30,7 +30,7 @@ export const GunLogo: React.FC<Props> = ({
       {!imgError ? (
         <img
           src="/ballistic-analyst-logo.jpg"
-          alt="Ballistic Analyst Logo"
+          alt="Ballastic Prediction System Logo"
           className="w-full h-full object-contain rounded-lg"
           onError={() => setImgError(true)}
         />

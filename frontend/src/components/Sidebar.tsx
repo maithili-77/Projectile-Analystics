@@ -75,7 +75,7 @@ export const Sidebar: React.FC<Props> = ({
         <div className="flex items-center gap-2.5">
           <GunLogo size="sm" />
           <span className="text-xs font-bold tracking-wider text-slate-100 uppercase">
-            BALLASTIX
+            BALLASTIC PREDICTION SYSTEM
           </span>
         </div>
         <button
@@ -111,9 +111,9 @@ export const Sidebar: React.FC<Props> = ({
               {(!isCollapsed || isOpenMobile) && (
                 <div className="truncate">
                   <div className="text-sm font-black tracking-wider text-slate-100 uppercase leading-snug">
-                    BALLASTIX
+                    BALLASTIC
                   </div>
-                  <div className="text-[10px] font-mono text-cyan-400">ANALYTICS PLATFORM</div>
+                  <div className="text-[10px] font-mono text-cyan-400">PREDICTION SYSTEM</div>
                 </div>
               )}
             </div>

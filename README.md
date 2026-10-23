@@ -1,4 +1,4 @@
-# Ballastix - Advanced Ballistic Analytics and Simulation Platform
+# Ballastic Prediction System - Advanced Ballistic Analytics and Simulation Platform
 
 > [!IMPORTANT]
 > **Academic & Research Compliance Disclaimer**

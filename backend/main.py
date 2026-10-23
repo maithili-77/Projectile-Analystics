@@ -31,8 +31,8 @@ from backend.schemas.prediction import PredictionResult
 from backend.utils.model_registry import registry
 
 app = FastAPI(
-    title="Ballastix API",
-    description="Ballastix - Academic ML & Computational Physics Research API",
+    title="Ballastic Prediction System API",
+    description="Ballastic Prediction System - Academic ML & Computational Physics Research API",
     version="2.0.0"
 )
 
@@ -63,8 +63,8 @@ def get_health():
     
     return {
         "status": "online",
-        "platform": "Ballastix",
-        "academic_notice": "Ballastix - Academic Research & Machine Learning Visualization Platform",
+        "platform": "Ballastic Prediction System",
+        "academic_notice": "Ballastic Prediction System - Academic Research & Machine Learning Visualization Platform",
         "models_loaded": f"{loaded_count}/{total_count}",
         "registry": all_meta
     }
