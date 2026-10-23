@@ -1,18 +1,14 @@
-"""
-Model Registry Utility
-Manages model metadata, feature requirements, preprocessors, scalers, encoders, and metrics.
-"""
-
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
+
 
 @dataclass
 class ModelMetadata:
     model_id: str
     model_name: str
-    domain: str                                 # trajectory, performance, or v50
-    target: str                                 # range_actual, V100, v50, etc.
-    model_type: str                             # Pipeline, RandomForestRegressor, etc.
+    domain: str
+    target: str
+    model_type: str
     expected_num_features: int
     feature_names: List[str]
     scaler: Optional[str] = None
@@ -23,29 +19,47 @@ class ModelMetadata:
     file_path: str = ""
     error: Optional[str] = None
 
+
 class ModelRegistry:
     def __init__(self):
         self._models: Dict[str, Any] = {}
         self._metadata: Dict[str, ModelMetadata] = {}
+        self._loader: Optional[Callable[[str], Any]] = None
+        self._attempted = set()
 
-    def register(self, model_id: str, model_obj: Any, metadata: ModelMetadata):
-        """Registers a loaded model object alongside its metadata."""
+    def set_loader(self, loader):
+        self._loader = loader
+
+    def register(self, model_id, model_obj, metadata):
         self._models[model_id] = model_obj
         self._metadata[model_id] = metadata
+        if model_obj is not None:
+            self._attempted.add(model_id)
 
-    def get_model(self, model_id: str) -> Optional[Any]:
-        """Retrieves a loaded model instance by ID."""
-        return self._models.get(model_id)
+    def get_model(self, model_id):
+        model = self._models.get(model_id)
+        if model is not None:
+            return model
 
-    def get_metadata(self, model_id: str) -> Optional[ModelMetadata]:
-        """Retrieves metadata for a specific model."""
+        if model_id in self._attempted or self._loader is None:
+            return None
+
+        self._attempted.add(model_id)
+        try:
+            return self._loader(model_id)
+        except Exception as exc:
+            meta = self._metadata.get(model_id)
+            if meta:
+                meta.error = str(exc)
+            print(f"[ModelRegistry] Could not load {model_id}: {exc}")
+            return None
+
+    def get_metadata(self, model_id):
         return self._metadata.get(model_id)
 
-    def get_all_metadata(self) -> Dict[str, Any]:
-        """Returns metadata dictionary for all registered models."""
-        result = {}
-        for mid, meta in self._metadata.items():
-            result[mid] = {
+    def get_all_metadata(self):
+        return {
+            mid: {
                 "model_id": meta.model_id,
                 "model_name": meta.model_name,
                 "domain": meta.domain,
@@ -59,25 +73,28 @@ class ModelRegistry:
                 "model_metrics": meta.model_metrics,
                 "loaded": meta.loaded,
                 "file_path": meta.file_path,
-                "error": meta.error
+                "error": meta.error,
             }
-        return result
+            for mid, meta in self._metadata.items()
+        }
 
-    def get_model_metrics(self) -> Dict[str, Any]:
-        """Returns offline benchmark evaluation metrics for all registered models."""
-        metrics = {}
-        for mid, meta in self._metadata.items():
-            if meta.model_metrics:
-                metrics[mid] = {
-                    "model_name": meta.model_name,
-                    "target": meta.target,
-                    "domain": meta.domain,
-                    "metrics": meta.model_metrics
-                }
-        return metrics
+    def get_model_metrics(self):
+        return {
+            mid: {
+                "model_name": meta.model_name,
+                "target": meta.target,
+                "domain": meta.domain,
+                "metrics": meta.model_metrics,
+            }
+            for mid, meta in self._metadata.items()
+            if meta.model_metrics
+        }
 
-    def list_models(self) -> List[str]:
-        return list(self._models.keys())
+    def list_models(self):
+        return [
+            model_id for model_id, model in self._models.items()
+            if model is not None
+        ]
 
-# Singleton Registry Instance
+
 registry = ModelRegistry()
