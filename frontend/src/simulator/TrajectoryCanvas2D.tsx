@@ -54,6 +54,17 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // Single source of truth values for range and height telemetry display
+  const v0Comp = Math.max(1, Number(velocity));
+  const safeAngleComp = Math.max(0.5, Math.min(89.5, Number(angleDeg)));
+  const radComp = (safeAngleComp * Math.PI) / 180;
+  const gComp = Number(gravity) > 0 ? Number(gravity) : 9.81;
+  const baselineTheoRange = (v0Comp * v0Comp * Math.sin(2 * radComp)) / gComp;
+  const baselineTheoHeight = (v0Comp * v0Comp * Math.sin(radComp) * Math.sin(radComp)) / (2 * gComp);
+
+  const displayTargetRange = (predictedRange && predictedRange > 0) ? predictedRange : ((maxRange && maxRange > 0) ? maxRange : baselineTheoRange);
+  const displayTargetHeight = (predictedHeight && predictedHeight > 0) ? predictedHeight : ((maxHeight && maxHeight > 0) ? maxHeight : baselineTheoHeight);
+
   // High-performance animation refs (Zero React re-render overhead during 60 FPS flight)
   const progressRef = useRef<number>(0); // 0 to 1
   const isPlayingRef = useRef<boolean>(false);
@@ -377,9 +388,9 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     const theoHeight = (v0 * v0 * Math.sin(rad) * Math.sin(rad)) / (2 * g);
     const totalFlightTime = (2 * v0 * Math.sin(rad)) / g;
 
-    // Use trained model prediction if available, else theoretical baseline
-    const targetDistance = (predictedRange && predictedRange > 0) ? predictedRange : theoRange;
-    const targetMaxHeight = (predictedHeight && predictedHeight > 0) ? predictedHeight : theoHeight;
+    // Model prediction response is the single source of truth for range and height
+    const targetDistance = (predictedRange && predictedRange > 0) ? predictedRange : ((maxRange && maxRange > 0) ? maxRange : theoRange);
+    const targetMaxHeight = (predictedHeight && predictedHeight > 0) ? predictedHeight : ((maxHeight && maxHeight > 0) ? maxHeight : theoHeight);
 
     // Maximum theoretical physical bounds across all angles for this launch velocity (45 deg for max range, 90 deg for max height)
     const maxPossibleRange = (v0 * v0) / g;
@@ -588,14 +599,14 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
       ctx.strokeStyle = '#f59e0b';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.roundRect(apexSx - 68, apexSy - 34, 136, 26, 6);
+      ctx.roundRect(apexSx - 80, apexSy - 34, 160, 26, 6);
       ctx.fill();
       ctx.stroke();
 
       ctx.fillStyle = '#fbbf24';
       ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`▲ APEX: ${Math.round(targetMaxHeight).toLocaleString()} m`, apexSx, apexSy - 20);
+      ctx.fillText(`▲ APEX: ${targetMaxHeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} m`, apexSx, apexSy - 20);
 
       ctx.fillStyle = '#94a3b8';
       ctx.font = '9px monospace';
@@ -663,7 +674,7 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     ctx.strokeStyle = '#00f0ff';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(targetSx - 62, targetSy + 8, 124, 28, 6);
+    ctx.roundRect(targetSx - 74, targetSy + 8, 148, 28, 6);
     ctx.fill();
     ctx.stroke();
 
@@ -674,7 +685,7 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
 
     ctx.fillStyle = '#a5f3fc';
     ctx.font = 'bold 10.5px monospace';
-    ctx.fillText(`${Math.round(targetDistance).toLocaleString()} m`, targetSx, targetSy + 32);
+    ctx.fillText(`${targetDistance.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} m`, targetSx, targetSy + 32);
 
     // Glowing impact touchdown rings beneath target stand
     const landingPulse = Math.sin(performance.now() * 0.007) * 2;
@@ -844,9 +855,19 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
     const interpSpeed = isImpacted ? Math.sqrt(vx * vx + vy * vy) : isStandby ? v0 : Math.sqrt(vx * vx + vy * vy);
 
     // Instant lag-free telemetry update directly into DOM elements
-    if (liveDownrangeDomRef.current) liveDownrangeDomRef.current.textContent = `${Math.round(interpX).toLocaleString()} m`;
-    if (liveAltDomRef.current) liveAltDomRef.current.textContent = `${Math.round(interpY).toLocaleString()} m`;
-    if (liveSpeedDomRef.current) liveSpeedDomRef.current.textContent = `${Math.round(interpSpeed)} m/s (Mach ${(interpSpeed / 343).toFixed(1)})`;
+    if (liveDownrangeDomRef.current) {
+      liveDownrangeDomRef.current.textContent = isImpacted
+        ? `${targetDistance.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} m`
+        : `${Math.round(interpX).toLocaleString()} m`;
+    }
+    if (liveAltDomRef.current) {
+      liveAltDomRef.current.textContent = isImpacted
+        ? '0.0 m'
+        : `${Math.round(interpY).toLocaleString()} m`;
+    }
+    if (liveSpeedDomRef.current) {
+      liveSpeedDomRef.current.textContent = `${Math.round(interpSpeed)} m/s (Mach ${(interpSpeed / 343).toFixed(1)})`;
+    }
 
     // Glowing motion tracer ribbon trailing behind bullet in flight
     if (!isStandby && !isImpacted && curProg > 0.01) {
@@ -1050,7 +1071,7 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
       ctx.strokeStyle = '#10b981';
       ctx.lineWidth = 2;
 
-      const bannerWidth = 290;
+      const bannerWidth = 320;
       const bannerX = width / 2 - bannerWidth / 2;
       const bannerY = padTop + 8;
 
@@ -1067,7 +1088,7 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
       ctx.fillStyle = '#cbd5e1';
       ctx.font = '10px monospace';
       ctx.fillText(
-        `Range: ${Math.round(targetDistance).toLocaleString()}m  •  Flight: ${(totalFlightTime || 0).toFixed(1)}s`,
+        `Range: ${targetDistance.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} m  •  Flight: ${(totalFlightTime || 0).toFixed(1)}s`,
         width / 2,
         bannerY + 34
       );
@@ -1169,10 +1190,10 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
             SPEED: <strong ref={liveSpeedDomRef}>{Math.round(velocity)} m/s</strong>
           </div>
           <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded bg-slate-950/85 border border-amber-500/40 text-[9px] sm:text-[10px] font-mono text-amber-300 backdrop-blur-sm shadow-md">
-            HEIGHT: <strong>{Math.round(predictedHeight || maxHeight).toLocaleString()} m</strong>
+            HEIGHT: <strong>{displayTargetHeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} m</strong>
           </div>
           <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded bg-slate-950/85 border border-emerald-500/40 text-[9px] sm:text-[10px] font-mono text-emerald-300 backdrop-blur-sm shadow-md">
-            RANGE: <strong>{Math.round(predictedRange || maxRange).toLocaleString()} m</strong>
+            RANGE: <strong>{displayTargetRange.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} m</strong>
           </div>
         </div>
       </div>
@@ -1258,14 +1279,14 @@ export const TrajectoryCanvas2D: React.FC<Props> = ({
         <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-700/80">
           <div className="text-[10px] text-slate-400 uppercase font-bold">Apex Max Height</div>
           <div className="text-sm font-bold text-amber-300 mt-0.5">
-            {Math.round(predictedHeight || maxHeight).toLocaleString()} m
+            {displayTargetHeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} m
           </div>
         </div>
 
         <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-700/80">
           <div className="text-[10px] text-slate-400 uppercase font-bold">Target Max Range</div>
           <div className="text-sm font-bold text-rose-300 mt-0.5">
-            {Math.round(predictedRange || maxRange).toLocaleString()} m
+            {displayTargetRange.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} m
           </div>
         </div>
       </div>

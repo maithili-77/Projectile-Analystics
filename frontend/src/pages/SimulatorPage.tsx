@@ -45,7 +45,7 @@ export const SimulatorPage: React.FC = () => {
 
   // 2. Trajectory Inputs (accurate_ballastic.csv)
   const [trajVelocity, setTrajVelocity] = useState<number>(600);
-  const [trajAngleDeg, setTrajAngleDeg] = useState<number>(45);
+  const [trajAngleDeg, setTrajAngleDeg] = useState<number>(36.5);
   const [trajGravity, setTrajGravity] = useState<number>(9.81);
 
   // 3. Performance Inputs (ballistics_500.csv)
@@ -74,12 +74,28 @@ export const SimulatorPage: React.FC = () => {
   const [v50LudwikN, setV50LudwikN] = useState<number>(0.2);
   const [v50Angle, setV50Angle] = useState<number>(0.0);
 
-  // Status & Prediction Results
-  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
+  // Status & Prediction Results (Pre-initialized with canonical model predictions for 600 m/s, 36.5°, 9.81 m/s²)
+  const [prediction, setPrediction] = useState<PredictionResult | null>({
+    prediction: {
+      range_actual: 35226.98,
+      max_height_actual: 6522.66
+    },
+    model_name: 'Random Forest Regressor (Range)',
+    input_valid: true,
+    domain_score: 1.0,
+    domain_coverage_explanation: 'Input Domain Coverage measures similarity to the training data and is not probability of correctness.',
+    warnings: [],
+    metrics: { MAE: 107.48, MSE: 24689.5, RMSE: 157.13, R2: 0.999955 },
+    feature_importances: [
+      { feature: 'velocity', importance: 0.794 },
+      { feature: 'angle_deg', importance: 0.2058 },
+      { feature: 'gravity', importance: 0.0001 }
+    ]
+  });
   const [simulationRes, setSimulationRes] = useState<SimulationResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [predictionStatus, setPredictionStatus] = useState<'NEWLY PREDICTED' | 'PREVIOUS PREDICTION' | 'PENDING'>('PENDING');
+  const [predictionStatus, setPredictionStatus] = useState<'NEWLY PREDICTED' | 'PREVIOUS PREDICTION' | 'PENDING'>('NEWLY PREDICTED');
 
   // Trajectory Canvas View toggle (2D / 3D)
   const [activeView, setActiveView] = useState<'2d' | '3d'>('2d');

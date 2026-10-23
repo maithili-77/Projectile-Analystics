@@ -38,8 +38,8 @@ export const Trajectory3DCanvas: React.FC<Props> = ({
     const theoHeight = (v0 * v0 * Math.sin(rad) * Math.sin(rad)) / (2 * g);
     const totalFlightTime = (2 * v0 * Math.sin(rad)) / g;
 
-    const targetRange = (predictedRange && predictedRange > 0) ? predictedRange : theoRange;
-    const targetHeight = (predictedHeight && predictedHeight > 0) ? predictedHeight : theoHeight;
+    const targetRange = (predictedRange && predictedRange > 0) ? predictedRange : ((maxRange && maxRange > 0) ? maxRange : theoRange);
+    const targetHeight = (predictedHeight && predictedHeight > 0) ? predictedHeight : ((maxHeight && maxHeight > 0) ? maxHeight : theoHeight);
 
     const scaleX = targetRange / Math.max(0.1, theoRange);
     const scaleY = targetHeight / Math.max(0.1, theoHeight);
