@@ -26,7 +26,7 @@ MODEL_SEARCH_PATHS = [
 OFFLINE_METRICS = {
     "trajectory_range": {"MAE": 107.48, "MSE": 24689.5, "RMSE": 157.13, "R2": 0.999955},
     "trajectory_height": {"MAE": 26.65, "MSE": 1898.5, "RMSE": 43.57, "R2": 0.999984},
-    "performance_v100": {"MAE": 22.1, "MSE": 1169.6, "RMSE": 34.2, "R2": 0.9654, "CV_RMSE": 36.1},
+    "performance_v100": {"MAE": 63.30, "MSE": 6512.79, "RMSE": 80.70, "R2": 0.9912, "CV_RMSE": 77.38},
     "performance_v200": {"MAE": 28.4, "MSE": 1840.2, "RMSE": 42.9, "R2": 0.9510, "CV_RMSE": 45.2},
     "performance_e100": {"MAE": 85.2, "MSE": 14200.0, "RMSE": 119.1, "R2": 0.9610, "CV_RMSE": 124.5},
     "performance_e200": {"MAE": 64.1, "MSE": 9210.0, "RMSE": 95.9, "R2": 0.9480, "CV_RMSE": 99.8},

@@ -49,7 +49,7 @@ export const SimulatorPage: React.FC = () => {
   const [trajGravity, setTrajGravity] = useState<number>(9.81);
 
   // 3. Performance Inputs (ballistics_500.csv)
-  const [perfCartridge, setPerfCartridge] = useState<string>('.308 WINCHESTER');
+  const [perfCartridge, setPerfCartridge] = useState<string>('308 WINCHESTER');
   const [perfType, setPerfType] = useState<string>('Rifle');
   const [perfWeight, setPerfWeight] = useState<number>(150);
   const [perfBC, setPerfBC] = useState<number>(0.45);
@@ -257,9 +257,41 @@ export const SimulatorPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [trajVelocity, trajAngleDeg, trajGravity, selectedDataset]);
 
-  // Run initial prediction on non-trajectory dataset tab change
+  // Auto-predict reactively whenever user adjusts inputs in "Velocity at 100 & 200 yards..." (Performance)
   useEffect(() => {
-    if (selectedDataset !== 'trajectory') {
+    if (selectedDataset !== 'performance') return;
+    const v0 = Number(perfV0);
+    const w = Number(perfWeight);
+    const bc = Number(perfBC);
+
+    if (v0 <= 0 || w <= 0 || bc <= 0 || !perfCartridge || !perfType) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        setError(null);
+        const inputData: PerformanceInput = {
+          Cartridge: perfCartridge,
+          Type: perfType,
+          Weight: w,
+          BC: bc,
+          V0: v0,
+          targets: perfTargets
+        };
+
+        const predRes = await api.predictPerformance(inputData);
+        setPrediction(predRes);
+        setPredictionStatus('NEWLY PREDICTED');
+      } catch (err: any) {
+        console.error('Real-time performance velocity prediction error:', err);
+      }
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [perfCartridge, perfType, perfWeight, perfBC, perfV0, perfTargets, selectedDataset]);
+
+  // Run initial prediction on V50 dataset tab change
+  useEffect(() => {
+    if (selectedDataset === 'v50') {
       handlePredict(false);
     }
   }, [selectedDataset]);
@@ -269,14 +301,15 @@ export const SimulatorPage: React.FC = () => {
     if (selectedDataset === 'trajectory') {
       setTrajRunTrigger(0);
       // Real-time auto-predict hook will refresh prediction and status to 'NEWLY PREDICTED'
+    } else if (selectedDataset === 'performance') {
+      setPerfRunTrigger(0);
+      // Real-time auto-predict hook will refresh prediction and status to 'NEWLY PREDICTED'
     } else {
       if (predictionStatus === 'NEWLY PREDICTED') {
         setPredictionStatus('PREVIOUS PREDICTION');
       }
       if (selectedDataset === 'v50') {
         setV50RunTrigger(0);
-      } else if (selectedDataset === 'performance') {
-        setPerfRunTrigger(0);
       }
     }
   };
@@ -382,9 +415,15 @@ export const SimulatorPage: React.FC = () => {
                   <span>Model Input Features</span>
                 </h3>
                 <div className="flex items-center gap-1.5">
-                  {selectedDataset === 'trajectory' && (
-                    <span className="flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                  {(selectedDataset === 'trajectory' || selectedDataset === 'performance') && (
+                    <span className={`flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full border ${
+                      selectedDataset === 'performance'
+                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                        : 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                        selectedDataset === 'performance' ? 'bg-emerald-400' : 'bg-cyan-400'
+                      }`}></span>
                       Real-Time ML
                     </span>
                   )}
@@ -520,11 +559,14 @@ export const SimulatorPage: React.FC = () => {
                     onChange={(e) => { setPerfCartridge(e.target.value); markInputsChanged(); }}
                     className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs font-mono"
                   >
+                    <option value="308 WINCHESTER">308 WINCHESTER</option>
                     <option value=".308 WINCHESTER">.308 WINCHESTER</option>
                     <option value="223 REMINGTON">223 REMINGTON</option>
                     <option value="9MM LUGER">9MM LUGER</option>
                     <option value="30-06 SPRINGFIELD">30-06 SPRINGFIELD</option>
                     <option value="460 WEATHERBY MAGNUM">460 WEATHERBY MAGNUM</option>
+                    <option value="44-40 WINCHESTER">44-40 WINCHESTER</option>
+                    <option value="6MM REMINGTON">6MM REMINGTON</option>
                   </select>
                 </div>
 

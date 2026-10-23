@@ -65,8 +65,12 @@ def predict_performance_service(input_data: PerformanceInput) -> PredictionResul
     is_valid, warnings = validate_input("performance", data_dict)
     domain_score, explanation = calculate_domain_coverage("performance", data_dict)
 
+    cartridge_clean = input_data.Cartridge.strip()
+    if cartridge_clean.startswith("."):
+        cartridge_clean = cartridge_clean[1:]
+
     df_input = pd.DataFrame([{
-        "Cartridge": input_data.Cartridge,
+        "Cartridge": cartridge_clean,
         "Type": input_data.Type,
         "Weight": input_data.Weight,
         "BC": input_data.BC,
