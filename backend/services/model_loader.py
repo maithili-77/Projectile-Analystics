@@ -16,16 +16,16 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 # Directories to inspect
 MODEL_SEARCH_PATHS = [
+    os.path.join(BASE_DIR, "models"),
     os.path.join(BASE_DIR, "backend", "models", "trajectory"),
     os.path.join(BASE_DIR, "backend", "models", "performance"),
     os.path.join(BASE_DIR, "backend", "models", "v50"),
-    os.path.join(BASE_DIR, "models"),
 ]
 
 # Offline Training Benchmark Metrics (extracted from training notebooks)
 OFFLINE_METRICS = {
-    "trajectory_range": {"MAE": 28.5, "MSE": 1772.4, "RMSE": 42.1, "R2": 0.9982, "CV_Mean_R2": 0.9979},
-    "trajectory_height": {"MAE": 12.3, "MSE": 352.1, "RMSE": 18.7, "R2": 0.9988, "CV_Mean_R2": 0.9985},
+    "trajectory_range": {"MAE": 107.48, "MSE": 24689.5, "RMSE": 157.13, "R2": 0.999955},
+    "trajectory_height": {"MAE": 26.65, "MSE": 1898.5, "RMSE": 43.57, "R2": 0.999984},
     "performance_v100": {"MAE": 22.1, "MSE": 1169.6, "RMSE": 34.2, "R2": 0.9654, "CV_RMSE": 36.1},
     "performance_v200": {"MAE": 28.4, "MSE": 1840.2, "RMSE": 42.9, "R2": 0.9510, "CV_RMSE": 45.2},
     "performance_e100": {"MAE": 85.2, "MSE": 14200.0, "RMSE": 119.1, "R2": 0.9610, "CV_RMSE": 124.5},
