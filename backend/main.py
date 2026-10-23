@@ -48,10 +48,10 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup_event():
-    """Initialize models without precomputing all dataset summaries."""
-    print("[FastAPI] Executing server startup tasks...")
-    load_all_models()
-    print("[FastAPI] Model initialization complete.")
+    print("[FastAPI] Starting backend...")
+    # Models and dataset summaries are not preloaded here.
+    print("[FastAPI] Startup complete.")
+
 
 
 # 1. Healthcheck Endpoint
