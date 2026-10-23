@@ -49,9 +49,9 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup_event():
-    print("[FastAPI] Loading models...")
+    print("[FastAPI] Registering models...")
     load_all_models()
-    print("[FastAPI] Model loading finished.")
+    print("[FastAPI] Startup initialization complete.")
 
 
 
