@@ -95,74 +95,102 @@ def get_expected_feature_names(model_id: str, model_obj: Any) -> List[str]:
         return FEATURE_MAPPINGS["performance"]
     return []
 
-def load_all_models():
-    """Loads all trained model PKL files into memory once on startup."""
-    print("[ModelLoader] Scanning and loading PKL models into ModelRegistry...")
-    
-    model_definitions = [
-        # Trajectory
-        ("trajectory_range", "range_model.pkl", "trajectory", "range_actual", "Random Forest Regressor (Range)"),
-        ("trajectory_height", "height_model.pkl", "trajectory", "max_height_actual", "Random Forest Regressor (Height)"),
-        # Performance
-        ("performance_v100", "v100_random_forest.pkl", "performance", "V100", "Random Forest Pipeline (V100)"),
-        ("performance_v200", "v200_random_forest.pkl", "performance", "V200", "Random Forest Pipeline (V200)"),
-        ("performance_e100", "e100_random_forest.pkl", "performance", "E100", "Random Forest Pipeline (E100)"),
-        ("performance_e200", "e200_random_forest.pkl", "performance", "E200", "Random Forest Pipeline (E200)"),
-        ("performance_bd100", "bd100_random_forest.pkl", "performance", "BD100", "Random Forest Pipeline (BD100)"),
-        ("performance_bd200", "bd200_random_forest.pkl", "performance", "BD200", "Random Forest Pipeline (BD200)"),
-        # V50
-        ("v50_limit", "ballistics_v50_model.pkl", "v50", "v50", "Random Forest ColumnTransformer Pipeline (V50)"),
-    ]
+MODEL_DEFINITIONS = [
+    ("trajectory_range", "range_model.pkl", "trajectory", "range_actual",
+     "Random Forest Regressor (Range)"),
+    ("trajectory_height", "height_model.pkl", "trajectory", "max_height_actual",
+     "Random Forest Regressor (Height)"),
+    ("performance_v100", "v100_random_forest.pkl", "performance", "V100",
+     "Random Forest Pipeline (V100)"),
+    ("performance_v200", "v200_random_forest.pkl", "performance", "V200",
+     "Random Forest Pipeline (V200)"),
+    ("performance_e100", "e100_random_forest.pkl", "performance", "E100",
+     "Random Forest Pipeline (E100)"),
+    ("performance_e200", "e200_random_forest.pkl", "performance", "E200",
+     "Random Forest Pipeline (E200)"),
+    ("performance_bd100", "bd100_random_forest.pkl", "performance", "BD100",
+     "Random Forest Pipeline (BD100)"),
+    ("performance_bd200", "bd200_random_forest.pkl", "performance", "BD200",
+     "Random Forest Pipeline (BD200)"),
+    ("v50_limit", "ballistics_v50_model.pkl", "v50", "v50",
+     "Random Forest Pipeline (V50)"),
+]
 
-    for model_id, filename, domain, target, human_name in model_definitions:
-        loaded_obj = None
-        loaded_path = ""
-        
-        # Search across paths
-        for path_dir in MODEL_SEARCH_PATHS:
-            candidate = os.path.join(path_dir, filename)
-            if os.path.exists(candidate):
-                try:
-                    obj = joblib.load(candidate)
-                    loaded_obj = fix_unpickled_estimator(obj)
-                    loaded_path = candidate
-                    break
-                except Exception as e:
-                    print(f"[ModelLoader] Error loading {filename} from {candidate}: {e}")
 
-        if loaded_obj is not None:
-            comp = inspect_pipeline_components(loaded_obj)
-            feat_names = get_expected_feature_names(model_id, loaded_obj)
-            metrics = OFFLINE_METRICS.get(model_id, {})
-            
+def load_model_by_id(model_id: str):
+    """Load only the requested model."""
+    definition = next(
+        (item for item in MODEL_DEFINITIONS if item[0] == model_id),
+        None,
+    )
+    if definition is None:
+        return None
+
+    _, filename, domain, target, human_name = definition
+
+    for path_dir in MODEL_SEARCH_PATHS:
+        candidate = os.path.join(path_dir, filename)
+        if not os.path.isfile(candidate):
+            continue
+
+        try:
+            print(f"[ModelLoader] Loading on demand: {filename}")
+            obj = fix_unpickled_estimator(joblib.load(candidate))
+
+            comp = inspect_pipeline_components(obj)
+            feat_names = get_expected_feature_names(model_id, obj)
+
             meta = ModelMetadata(
                 model_id=model_id,
                 model_name=human_name,
                 domain=domain,
                 target=target,
-                model_type=type(loaded_obj).__name__,
+                model_type=type(obj).__name__,
                 expected_num_features=len(feat_names),
                 feature_names=feat_names,
                 scaler=comp["scaler"],
                 encoder=comp["encoder"],
                 preprocessor=comp["preprocessor"],
-                model_metrics=metrics,
+                model_metrics=OFFLINE_METRICS.get(model_id, {}),
                 loaded=True,
-                file_path=loaded_path
+                file_path=candidate,
             )
-            registry.register(model_id, loaded_obj, meta)
-            print(f"[ModelLoader] Loaded '{model_id}' ({filename}) - Domain: {domain}, Target: {target}")
-        else:
-            print(f"[ModelLoader] Warning: Could not locate PKL model file {filename}")
-            meta = ModelMetadata(
-                model_id=model_id,
-                model_name=human_name,
-                domain=domain,
-                target=target,
-                model_type="Unknown",
-                expected_num_features=0,
-                feature_names=[],
-                loaded=False,
-                error="File not found"
-            )
-            registry.register(model_id, None, meta)
+            registry.register(model_id, obj, meta)
+            print(f"[ModelLoader] Loaded: {model_id}")
+            return obj
+
+        except Exception as exc:
+            print(f"[ModelLoader] Failed loading {filename}: {exc}")
+            raise
+
+    meta = registry.get_metadata(model_id)
+    if meta:
+        meta.error = f"Model file not found: {filename}"
+
+    print(f"[ModelLoader] Missing model file: {filename}")
+    return None
+
+
+def load_all_models():
+    """Register model metadata without loading the model files."""
+    print("[ModelLoader] Registering models for on-demand loading...")
+    registry.set_loader(load_model_by_id)
+
+    for model_id, filename, domain, target, human_name in MODEL_DEFINITIONS:
+        feat_names = get_expected_feature_names(model_id, None)
+
+        meta = ModelMetadata(
+            model_id=model_id,
+            model_name=human_name,
+            domain=domain,
+            target=target,
+            model_type="Not loaded",
+            expected_num_features=len(feat_names),
+            feature_names=feat_names,
+            model_metrics=OFFLINE_METRICS.get(model_id, {}),
+            loaded=False,
+            file_path="",
+        )
+        registry.register(model_id, None, meta)
+
+    print("[ModelLoader] Model metadata registered; no PKL files loaded.")
