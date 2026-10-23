@@ -46,11 +46,13 @@ app.add_middleware(
 )
 
 
+
 @app.on_event("startup")
 def startup_event():
-    print("[FastAPI] Starting backend...")
-    # Models and dataset summaries are not preloaded here.
-    print("[FastAPI] Startup complete.")
+    print("[FastAPI] Loading models...")
+    load_all_models()
+    print("[FastAPI] Model loading finished.")
+
 
 
 
