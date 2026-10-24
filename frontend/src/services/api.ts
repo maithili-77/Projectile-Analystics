@@ -14,7 +14,28 @@ import {
   PredictionHistoryItem
 } from '../types';
 
-const API_BASE_URL = '/api';
+/**
+ * Resolves the API base URL from the VITE_API_URL environment variable.
+ * Handles variations:
+ * - With or without trailing slashes (e.g. 'https://ballastic-prediction.onrender.com/')
+ * - With or without '/api' suffix (e.g. 'https://ballastic-prediction.onrender.com' vs '.../api')
+ * - Falls back to '/api' for local development with the Vite proxy
+ */
+export const getApiBaseUrl = (): string => {
+  const envUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+
+  if (!envUrl) {
+    return '/api';
+  }
+
+  // Remove trailing slashes
+  const cleanUrl = envUrl.replace(/\/+$/, '');
+
+  // If already ends with /api, return as is; otherwise append /api
+  return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 
 const client = axios.create({
   baseURL: API_BASE_URL,
